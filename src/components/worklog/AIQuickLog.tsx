@@ -9,10 +9,12 @@ import {
 } from "lucide-react";
 import { useGeminiKey } from "@/hooks/useGeminiKey";
 import type { Task } from "@/types";
+import type { HistoryEntry } from "@/hooks/useTaskHistory";
 
 interface AIQuickLogProps {
   globalDate: string;
   onGenerate: (overrides: Partial<Task>[]) => void;
+  history: HistoryEntry[];
 }
 
 const GEMINI_URL =
@@ -46,6 +48,7 @@ function stripMarkdownFences(text: string): string {
 export default function AIQuickLog({
   globalDate,
   onGenerate,
+  history,
 }: AIQuickLogProps) {
   const { apiKey, setApiKey, hasKey } = useGeminiKey();
   const [isOpen, setIsOpen] = useState(false);
@@ -253,6 +256,41 @@ export default function AIQuickLog({
               </span>
             )}
           </div>
+
+          {/* Recent Tasks */}
+          {history.length > 0 && (
+            <div className="space-y-2">
+              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                Recent Tasks
+              </span>
+              <div className="flex flex-wrap gap-2">
+                {history
+                  .slice(-10)
+                  .reverse()
+                  .map((h) => (
+                    <button
+                      key={h.task}
+                      type="button"
+                      onClick={() =>
+                        onGenerate([
+                          {
+                            date: globalDate,
+                            task: h.task,
+                            outcome: h.outcome,
+                            category: h.category,
+                            priority: h.priority,
+                            plannedMinutes: h.plannedMinutes,
+                          },
+                        ])
+                      }
+                      className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-indigo-50 hover:text-indigo-600 rounded-full border border-gray-200 hover:border-indigo-200 transition-all cursor-pointer"
+                    >
+                      {h.task}
+                    </button>
+                  ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

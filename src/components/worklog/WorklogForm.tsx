@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Plus, ClipboardCopy, Check, Trash2 } from "lucide-react";
 import type { Task } from "@/types";
 import { useLocalTasks } from "@/hooks/useLocalTasks";
+import { useTaskHistory } from "@/hooks/useTaskHistory";
 import { todayISO } from "@/utils";
 import TaskCard from "./TaskCard";
 import AIQuickLog from "./AIQuickLog";
@@ -38,6 +39,7 @@ export default function WorklogForm() {
     removeTask,
     clearAll,
   } = useLocalTasks();
+  const { history, taskNames, saveToHistory } = useTaskHistory();
   const [copyState, setCopyState] = useState<"idle" | "copied">("idle");
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
   const [globalDate, setGlobalDate] = useState(todayISO());
@@ -77,6 +79,8 @@ export default function WorklogForm() {
   const handleCopy = async () => {
     if (tasks.length === 0) return;
     const tsv = buildTSV(tasks);
+    // Save completed tasks to history for future suggestions
+    saveToHistory(tasks);
     try {
       await navigator.clipboard.writeText(tsv);
       setCopyState("copied");
@@ -143,7 +147,11 @@ export default function WorklogForm() {
       </div>
 
       {/* AI Quick Log */}
-      <AIQuickLog globalDate={globalDate} onGenerate={handleAIGenerate} />
+      <AIQuickLog
+        globalDate={globalDate}
+        onGenerate={handleAIGenerate}
+        history={history}
+      />
 
       {/* Task cards */}
       <div className="space-y-3">
@@ -161,6 +169,7 @@ export default function WorklogForm() {
             task={task}
             index={idx}
             collapsed={collapsedIds.has(task.id)}
+            suggestions={taskNames}
             onToggle={() => handleToggleCollapse(task.id)}
             onUpdate={(field, value) => updateTask(task.id, field, value)}
             onRemove={() => removeTask(task.id)}

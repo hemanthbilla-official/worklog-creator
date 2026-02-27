@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Trash2, ChevronDown, ChevronUp, Plus } from "lucide-react";
+import AutocompleteInput from "./AutocompleteInput";
 import type { Task } from "@/types";
 import { PRIORITIES, STATUSES } from "@/constants";
 import { calcActualTime, minutesToUnits } from "@/utils";
@@ -8,6 +9,7 @@ interface TaskCardProps {
   task: Task;
   index: number;
   collapsed: boolean;
+  suggestions: string[];
   onToggle: () => void;
   onUpdate: (field: keyof Task, value: string) => void;
   onRemove: () => void;
@@ -17,6 +19,7 @@ export default function TaskCard({
   task,
   index,
   collapsed,
+  suggestions,
   onToggle,
   onUpdate,
   onRemove,
@@ -128,12 +131,11 @@ export default function TaskCard({
         </div>
         <div>
           <label className="label-text">Task Description</label>
-          <input
-            type="text"
-            placeholder="Describe the task..."
+          <AutocompleteInput
             value={task.task}
-            onChange={(e) => onUpdate("task", e.target.value)}
-            className="field"
+            onChange={(v) => onUpdate("task", v)}
+            suggestions={suggestions}
+            placeholder="Describe the task..."
           />
         </div>
         <div>

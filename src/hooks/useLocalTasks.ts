@@ -60,7 +60,8 @@ export function useLocalTasks() {
 
   const addMultipleTasks = useCallback((overridesArray: Partial<Task>[]) => {
     setTasks((prev) => [
-      ...prev,
+      // Remove untouched empty tasks so AI-generated ones don't sit beside blanks
+      ...prev.filter((t) => t.task || t.outcome || t.startTime || t.endTime),
       ...overridesArray.map((overrides) => createTask(overrides)),
     ]);
   }, []);
