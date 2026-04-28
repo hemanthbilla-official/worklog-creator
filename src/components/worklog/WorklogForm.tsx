@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Plus, ClipboardCopy, Check, Trash2 } from "lucide-react";
+import { Plus, ClipboardCopy, Check, Trash2, Zap } from "lucide-react";
 import type { Task } from "@/types";
 import { useLocalTasks } from "@/hooks/useLocalTasks";
 import { useTaskHistory } from "@/hooks/useTaskHistory";
 import { todayISO } from "@/utils";
 import TaskCard from "./TaskCard";
 import AIQuickLog from "./AIQuickLog";
+import AIReviewButton from "./AIReviewButton";
 
 function buildTSV(tasks: Task[]): string {
   return tasks
@@ -39,7 +40,8 @@ export default function WorklogForm() {
     removeTask,
     clearAll,
   } = useLocalTasks();
-  const { history, taskNames, saveToHistory } = useTaskHistory();
+  const { history, taskNames, getFrequentTasks, saveToHistory } =
+    useTaskHistory();
   const [copyState, setCopyState] = useState<"idle" | "copied">("idle");
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
   const [globalDate, setGlobalDate] = useState(todayISO());
@@ -54,6 +56,21 @@ export default function WorklogForm() {
     // Collapse all current tasks before inserting AI-generated ones
     setCollapsedIds(new Set(tasks.map((t) => t.id)));
     addMultipleTasks(overrides);
+  };
+
+  const handleAIFix = (overrides: Partial<Task>[]) => {
+    // Replace all tasks with the fixed versions from AI
+    addMultipleTasks(overrides);
+  };
+
+  const handleMyUsualDay = () => {
+    const frequent = getFrequentTasks(6);
+    if (frequent.length === 0) return;
+
+    // Add global date to each task
+    const withDate = frequent.map((t) => ({ ...t, date: globalDate }));
+    setCollapsedIds(new Set(tasks.map((t) => t.id)));
+    addMultipleTasks(withDate);
   };
 
   const handleCollapseAll = () => {
@@ -126,6 +143,18 @@ export default function WorklogForm() {
             />
           </div>
 
+          {/* My Usual Day */}
+          {history.length > 0 && (
+            <button
+              type="button"
+              onClick={handleMyUsualDay}
+              className="px-3 py-1.5 text-xs font-semibold bg-indigo-50 text-indigo-600 rounded-md hover:bg-indigo-100 transition-colors h-[34px] flex items-center gap-1.5 border border-indigo-200"
+            >
+              <Zap className="w-3.5 h-3.5" />
+              My Usual Day
+            </button>
+          )}
+
           {/* Collapse Controls */}
           <div className="flex gap-2">
             <button
@@ -145,6 +174,7 @@ export default function WorklogForm() {
           </div>
         </div>
       </div>
+
 
       {/* AI Quick Log */}
       <AIQuickLog
@@ -170,6 +200,7 @@ export default function WorklogForm() {
             index={idx}
             collapsed={collapsedIds.has(task.id)}
             suggestions={taskNames}
+            history={history}
             onToggle={() => handleToggleCollapse(task.id)}
             onUpdate={(field, value) => updateTask(task.id, field, value)}
             onRemove={() => removeTask(task.id)}
@@ -187,6 +218,8 @@ export default function WorklogForm() {
           <Plus className="w-4 h-4" />
           Add Another Task
         </button>
+
+        <AIReviewButton tasks={tasks} onFixedTasks={handleAIFix} />
 
         <button
           type="button"

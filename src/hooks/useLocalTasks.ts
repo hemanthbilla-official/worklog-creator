@@ -42,8 +42,8 @@ export function useLocalTasks() {
 
   // Hydrate from localStorage on mount (client only)
   useEffect(() => {
-    const saved = loadTasks();
-    setTasks(saved.length > 0 ? saved : [createTask()]);
+    const saved = loadTasks().filter((t) => t.task?.trim());
+    setTasks(saved);
     setHydrated(true);
   }, []);
 

@@ -20,17 +20,58 @@ interface AIQuickLogProps {
 const GEMINI_URL =
   "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent";
 
-function buildSystemPrompt(todayFormatted: string): string {
-  return `You are a task extraction assistant. Extract the tasks, start times, and end times from the following text. Calculate the totalPlannedTime in hours (decimal, e.g. 1.50). Set category to 'NIAT', priority to 'High', and status to 'Not Done' by default. Generate a concise expected outcome for each task using present/future tense (e.g. "Complete daily sync", "Deliver class session", "Resolve student doubts"). Never use past tense words like "completed", "delivered", or "resolved". If the user does not specify a date, use "${todayFormatted}".
+function buildHistoryContext(history: HistoryEntry[]): string {
+  if (history.length === 0) return "";
+  const recent = history.slice(-15);
+  const lines = recent.map(
+    (h) =>
+      `- "${h.task}" (${h.category}, ${h.priority}, ~${h.plannedMinutes || "?"}min)`,
+  );
+  return `\n\nHere are the user's recent/frequent tasks for context. Use these to infer times, categories, and priorities when the user is vague:\n${lines.join("\n")}`;
+}
 
-Return ONLY a raw JSON array of objects matching this exact structure — no markdown fences, no explanation, no extra text:
-[{ "date": "YYYY-MM-DD", "task": "string", "category": "NIAT", "outcome": "expected outcome in present/future tense", "priority": "High", "status": "Not Done", "totalPlannedTime": "number as string e.g. 1.50", "startTime": "HH:mm (24h)", "endTime": "HH:mm (24h)", "actualTime": "number as string e.g. 1.50", "remarks": "", "dependencies": "", "deviations": "" }]
+function buildSystemPrompt(
+  todayFormatted: string,
+  history: HistoryEntry[],
+): string {
+  const historyBlock = buildHistoryContext(history);
+
+  return `You are a smart worklog assistant. The user will describe their day casually — sometimes with full details, sometimes very vaguely (e.g. "standup, 2 classes, helped students"). Your job is to turn that into structured worklog entries.
+
+Key behaviors:
+- If the user gives times, use them exactly.
+- If the user is vague about times, infer reasonable times based on their history patterns below. Space tasks logically throughout the day (e.g. standup early morning, classes mid-morning, etc).
+- If you truly cannot infer a time, leave startTime and endTime as "".
+- Category defaults to "NIAT" unless specified.
+- Priority defaults to "High" unless specified.
+- Date defaults to "${todayFormatted}" unless specified.
+
+Status rules (VERY IMPORTANT — read the user's intent):
+- Default status is "Not Done".
+- If the user says "done", "completed", "finished", "over", or uses past tense (e.g. "took class", "had standup", "cleared doubts"), set status to "Completed".
+- If the user says "in progress", "doing", "working on", "ongoing", set status to "In Progress".
+- If the user says "pending", "not done", "yet to start", "will do", "need to", set status to "Not Done" or "Yet to Start".
+- If the user says "on hold", "blocked", "waiting", set status to "On Hold".
+- If the user says "carry forward", "tomorrow", "postpone", set status to "Carry Forward".
+- Valid statuses are ONLY: "Completed", "Not Done", "Yet to Start", "On Hold", "In Progress", "Carry Forward".
+- Understand the user's intent — e.g. "Class 8:30 to 9:30 done" means status is "Completed".
+
+Outcome rules (IMPORTANT):
+- Write DETAILED, SPECIFIC outcomes — not generic ones.
+- Use present/future tense. Never use past tense or words ending in -ed.
+- BAD: "Class delivered", "Sync completed", "Doubts resolved"
+- GOOD: "Deliver interactive session on the scheduled topic, covering key concepts with live coding examples and Q&A"
+- GOOD: "Conduct daily standup to sync on progress, blockers, and priorities for the day"
+- GOOD: "Provide one-on-one doubt clearing support to students, addressing conceptual gaps and debugging issues"
+- Each outcome should be 1-2 sentences, specific to the task.${historyBlock}
+
+Return ONLY a raw JSON array — no markdown fences, no explanation, no extra text:
+[{ "date": "YYYY-MM-DD", "task": "string", "category": "NIAT", "outcome": "detailed specific outcome in present/future tense", "priority": "High", "status": "Completed or Not Done etc", "totalPlannedTime": "decimal hours e.g. 1.50", "startTime": "HH:mm (24h)", "endTime": "HH:mm (24h)", "actualTime": "decimal hours e.g. 1.50", "remarks": "", "dependencies": "", "deviations": "" }]
 
 Rules:
-- outcome must be a short expected result in present/future tense (never past tense, never use words ending in -ed)
 - startTime and endTime must be in 24-hour HH:mm format (e.g. "09:30", "14:00")
-- totalPlannedTime and actualTime should be the duration in hours as a decimal string (e.g. "0.50", "2.00")
-- If no end time is given, leave endTime as "" and set totalPlannedTime and actualTime to ""
+- totalPlannedTime and actualTime = duration in hours as decimal string (e.g. "0.50", "2.00")
+- If no end time can be inferred, leave endTime as "" and set totalPlannedTime and actualTime to ""
 - Output ONLY the JSON array. No other text whatsoever.`;
 }
 
@@ -73,7 +114,7 @@ export default function AIQuickLog({
               parts: [
                 {
                   text:
-                    buildSystemPrompt(globalDate) +
+                    buildSystemPrompt(globalDate, history) +
                     "\n\nUser input:\n" +
                     input.trim(),
                 },
@@ -81,7 +122,7 @@ export default function AIQuickLog({
             },
           ],
           generationConfig: {
-            temperature: 0.1,
+            temperature: 0.2,
           },
         }),
       });
@@ -211,7 +252,7 @@ export default function AIQuickLog({
             <textarea
               rows={3}
               placeholder={
-                "e.g., Standup 9:30am to 10am\nTypescript class 10:30 to 12:30\nDoubt clearing 2pm to 2:30pm"
+                "Just describe your day casually...\ne.g., standup, 2 classes, helped students after lunch\nor: took react class 10:30-12:30, doubt clearing"
               }
               value={input}
               onChange={(e) => setInput(e.target.value)}

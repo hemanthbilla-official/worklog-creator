@@ -188,3 +188,32 @@ select.field {
   border-left: 3px solid transparent;
   border-image: linear-gradient(180deg, #8b5cf6, #6366f1) 1;
 }
+
+/* ─── "Now" time button ──────────────────────────────────────────── */
+.now-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0 0.5rem;
+  height: 40px;
+  border-radius: 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--accent);
+  background: var(--accent-glow);
+  border: 1px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+}
+.now-btn:hover {
+  background: #e0e7ff;
+  border-color: var(--accent);
+}
+.now-btn:active {
+  transform: translateY(1px);
+}

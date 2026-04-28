@@ -63,5 +63,35 @@ export function useTaskHistory() {
   /** All unique task names from history */
   const taskNames = history.map((h) => h.task);
 
-  return { history, taskNames, saveToHistory };
+  /** Return the most frequent tasks from history, sorted by frequency (descending) */
+  const getFrequentTasks = useCallback(
+    (limit = 6): Partial<Task>[] => {
+      const freq = new Map<string, { count: number; entry: HistoryEntry }>();
+      for (const h of history) {
+        const key = h.task.trim().toLowerCase();
+        if (!key) continue;
+        const existing = freq.get(key);
+        if (existing) {
+          existing.count++;
+          existing.entry = h; // keep most recent version
+        } else {
+          freq.set(key, { count: 1, entry: h });
+        }
+      }
+
+      return Array.from(freq.values())
+        .sort((a, b) => b.count - a.count)
+        .slice(0, limit)
+        .map(({ entry }) => ({
+          task: entry.task,
+          outcome: entry.outcome,
+          category: entry.category,
+          priority: entry.priority,
+          plannedMinutes: entry.plannedMinutes,
+        }));
+    },
+    [history],
+  );
+
+  return { history, taskNames, getFrequentTasks, saveToHistory };
 }
