@@ -52,6 +52,13 @@ function formatDateForSheets(value: string): string {
   return `${dayNumber}-${monthNames[monthIndex]}-${year}`;
 }
 
+function formatTimeSpentForSheets(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+
+  return /^\d+:\d{2}$/.test(trimmed) ? `'${trimmed}` : trimmed;
+}
+
 function getCopyableTasks(tasks: Task[]): Task[] {
   return tasks.filter((task) => task.task.trim());
 }
@@ -62,7 +69,7 @@ function buildTSV(tasks: Task[]): string {
       [
         formatDateForSheets(task.date),
         task.task,
-        task.timeSpent,
+        formatTimeSpentForSheets(task.timeSpent),
         normalizeStatus(task.status),
       ]
         .map(sanitizeCell)
