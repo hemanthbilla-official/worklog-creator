@@ -1,7 +1,5 @@
 import type { TaskTemplate } from "@/types";
 
-export const PRIORITIES = ["Highest", "High", "Medium", "Low", "Adhoc"];
-
 export const STATUSES = [
   "Completed",
   "Not Done",
@@ -11,55 +9,70 @@ export const STATUSES = [
   "Carry Forward",
 ];
 
+export function normalizeStatus(status: string): string {
+  const value = status.trim().toLowerCase().replace(/\s+/g, " ");
+
+  if (["completed", "complete", "compeleted", "done", "finished"].includes(value)) {
+    return "Completed";
+  }
+  if (["not done", "pending", "incomplete"].includes(value)) {
+    return "Not Done";
+  }
+  if (["yet to start", "not started", "to start"].includes(value)) {
+    return "Yet to Start";
+  }
+  if (["on hold", "hold", "blocked", "waiting"].includes(value)) {
+    return "On Hold";
+  }
+  if (["in progress", "progress", "ongoing", "working"].includes(value)) {
+    return "In Progress";
+  }
+  if (["carry forward", "carried forward", "postpone", "postponed"].includes(value)) {
+    return "Carry Forward";
+  }
+
+  return STATUSES.includes(status) ? status : "Not Done";
+}
+
 export const TASK_TEMPLATES: TaskTemplate[] = [
   {
     label: "Worklog & Standup",
     defaults: {
-      task: "Worklog and Standup",
-      outcome: "Daily sync completed",
-      priority: "High",
+      task: "Update daily worklog entries and attend standup sync to align on progress, blockers, and priorities",
       status: "Completed",
-      plannedMinutes: "15",
+      timeSpent: "0:15",
     },
   },
   {
     label: "Class Prep",
     defaults: {
-      task: "Prep for class",
-      outcome: "Preparation completed",
-      priority: "High",
+      task: "Prepare class material, examples, and practice flow for the upcoming student learning session",
       status: "Completed",
-      plannedMinutes: "30",
+      timeSpent: "0:30",
     },
   },
   {
     label: "Conduct Class",
     defaults: {
-      task: "Conduct class session",
-      outcome: "Session delivered",
-      priority: "Highest",
+      task: "Conduct scheduled class session for students with concept explanation, live examples, and Q&A support",
       status: "Completed",
-      plannedMinutes: "60",
+      timeSpent: "1:00",
     },
   },
   {
     label: "Doubt Clearing",
     defaults: {
-      task: "Doubt clearing / Student support",
-      outcome: "Doubts resolved",
-      priority: "Medium",
+      task: "Clear student doubts through one-on-one support, debugging guidance, and conceptual clarification",
       status: "Completed",
-      plannedMinutes: "15",
+      timeSpent: "0:15",
     },
   },
   {
     label: "LH Meeting",
     defaults: {
-      task: "LH Meeting",
-      outcome: "Meeting attended",
-      priority: "High",
+      task: "Attend LH meeting to review updates, discuss blockers, and align on next action items",
       status: "Completed",
-      plannedMinutes: "30",
+      timeSpent: "0:30",
     },
   },
 ];

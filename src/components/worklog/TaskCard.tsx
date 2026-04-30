@@ -1,20 +1,36 @@
-import { useState, useEffect, useRef } from "react";
-import { Trash2, ChevronDown, ChevronUp, Settings2 } from "lucide-react";
+import { Trash2, ChevronDown, ChevronUp, BookOpenText } from "lucide-react";
 import AutocompleteInput from "./AutocompleteInput";
 import type { Task } from "@/types";
-import type { HistoryEntry } from "@/hooks/useTaskHistory";
-import { PRIORITIES, STATUSES } from "@/constants";
-import { calcActualTime, minutesToUnits } from "@/utils";
+import { STATUSES } from "@/constants";
 
 interface TaskCardProps {
   task: Task;
   index: number;
   collapsed: boolean;
   suggestions: string[];
-  history: HistoryEntry[];
   onToggle: () => void;
+  onPreview: () => void;
   onUpdate: (field: keyof Task, value: string) => void;
   onRemove: () => void;
+}
+
+function statusClass(status: string): string {
+  switch (status) {
+    case "Completed":
+      return "bg-green-50 text-green-600";
+    case "Not Done":
+      return "bg-red-50 text-red-600";
+    case "Yet to Start":
+      return "bg-amber-50 text-amber-700";
+    case "On Hold":
+      return "bg-purple-50 text-purple-600";
+    case "In Progress":
+      return "bg-rose-50 text-rose-600";
+    case "Carry Forward":
+      return "bg-blue-50 text-blue-600";
+    default:
+      return "bg-gray-100 text-gray-500";
+  }
 }
 
 export default function TaskCard({
@@ -22,51 +38,12 @@ export default function TaskCard({
   index,
   collapsed,
   suggestions,
-  history,
   onToggle,
+  onPreview,
   onUpdate,
   onRemove,
 }: TaskCardProps) {
-  const [showDetails, setShowDetails] = useState(false);
-  const [showNotes, setShowNotes] = useState(false);
-  const prevTaskRef = useRef(task.task);
-
-  // Auto-calculate actual time when start/end change
-  useEffect(() => {
-    const computed = calcActualTime(task.startTime, task.endTime);
-    if (computed !== task.actualTime) {
-      onUpdate("actualTime", computed);
-    }
-  }, [task.startTime, task.endTime]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Auto-calculate planned time (hours) from planned minutes
-  useEffect(() => {
-    const computed = minutesToUnits(task.plannedMinutes);
-    if (computed !== task.totalPlannedTime) {
-      onUpdate("totalPlannedTime", computed);
-    }
-  }, [task.plannedMinutes]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Auto-fill outcome from history when task name changes
-  useEffect(() => {
-    if (task.task === prevTaskRef.current) return;
-    prevTaskRef.current = task.task;
-
-    // Only auto-fill if outcome is empty
-    if (task.outcome) return;
-    if (!task.task.trim()) return;
-
-    const match = history.find(
-      (h) => h.task.trim().toLowerCase() === task.task.trim().toLowerCase(),
-    );
-    if (match && match.outcome) {
-      onUpdate("outcome", match.outcome);
-    }
-  }, [task.task, task.outcome, history]); // eslint-disable-line react-hooks/exhaustive-deps
-
   const summary = task.task || "Untitled task";
-
-  // ── Collapsed view ──────────────────────────────────────────────
 
   if (collapsed) {
     return (
@@ -86,25 +63,31 @@ export default function TaskCard({
           <span className="text-sm font-medium text-gray-800 truncate">
             {summary}
           </span>
-          {task.plannedMinutes && (
+          {task.timeSpent && (
             <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full shrink-0">
-              {task.plannedMinutes}m
+              {task.timeSpent}
             </span>
           )}
-          {task.status && task.status !== "Yet to Start" && (
+          {task.status && (
             <span
-              className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${
-                task.status === "Completed"
-                  ? "bg-green-50 text-green-600"
-                  : "bg-gray-100 text-gray-500"
-              }`}
+              className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${statusClass(task.status)}`}
             >
               {task.status}
             </span>
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {/* Quick Done toggle */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onPreview();
+            }}
+            className="h-7 w-7 inline-flex items-center justify-center rounded-md text-blue-500 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+            title="Read full task"
+          >
+            <BookOpenText className="w-4 h-4" />
+          </button>
           <button
             type="button"
             onClick={(e) => {
@@ -131,6 +114,7 @@ export default function TaskCard({
               onRemove();
             }}
             className="text-red-400 hover:text-red-600 transition-colors ml-1"
+            title="Remove task"
           >
             <Trash2 className="w-4 h-4" />
           </button>
@@ -139,13 +123,8 @@ export default function TaskCard({
     );
   }
 
-  // ── Expanded view (compact by default) ─────────────────────────
-
   return (
-    <div
-      className={`glass-card p-6 space-y-5 relative animate-fade-in border-l-4 border-l-indigo-500 shadow-lg shadow-indigo-500/5 transition-all duration-300`}
-    >
-      {/* Header */}
+    <div className="glass-card p-5 space-y-4 relative animate-fade-in border-l-4 border-l-indigo-500 shadow-lg shadow-indigo-500/5 transition-all duration-300">
       <div className="flex items-center justify-between">
         <button
           type="button"
@@ -155,75 +134,57 @@ export default function TaskCard({
           <ChevronUp className="w-3.5 h-3.5" />
           Task {index + 1}
         </button>
-        <button
-          type="button"
-          onClick={onRemove}
-          className="text-red-400 hover:text-red-600 transition-colors text-sm flex items-center gap-1"
-        >
-          <Trash2 className="w-4 h-4" />
-          Remove
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={onPreview}
+            className="text-blue-500 hover:text-blue-700 transition-colors text-sm flex items-center gap-1"
+          >
+            <BookOpenText className="w-4 h-4" />
+            Read
+          </button>
+          <button
+            type="button"
+            onClick={onRemove}
+            className="text-red-400 hover:text-red-600 transition-colors text-sm flex items-center gap-1"
+          >
+            <Trash2 className="w-4 h-4" />
+            Remove
+          </button>
+        </div>
       </div>
 
-      {/* === Compact fields (always visible): Task, Outcome, Times, Status === */}
-
-      {/* Task Description */}
-      <div>
-        <label className="label-text">Task Description</label>
-        <AutocompleteInput
-          value={task.task}
-          onChange={(v) => onUpdate("task", v)}
-          suggestions={suggestions}
-          placeholder="Describe the task..."
-        />
-      </div>
-
-      {/* Outcome */}
-      <div>
-        <label className="label-text">Outcome</label>
-        <input
-          type="text"
-          placeholder="Expected outcome (detailed)"
-          value={task.outcome}
-          onChange={(e) => onUpdate("outcome", e.target.value)}
-          className="field"
-        />
-      </div>
-
-      {/* Times + Status in one row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-[160px_minmax(0,1fr)_160px_220px] gap-4">
         <div>
-          <label className="label-text">Start Time</label>
+          <label className="label-text">Date</label>
           <input
-            type="time"
-            value={task.startTime}
-            onChange={(e) => onUpdate("startTime", e.target.value)}
+            type="date"
+            value={task.date}
+            onChange={(e) => onUpdate("date", e.target.value)}
             className="field"
           />
         </div>
         <div>
-          <label className="label-text">End Time</label>
+          <label className="label-text">Tasks</label>
+          <AutocompleteInput
+            value={task.task}
+            onChange={(v) => onUpdate("task", v)}
+            suggestions={suggestions}
+            placeholder="Very detailed task, e.g. Conduct React hooks practice session with examples and doubt clarification"
+          />
+        </div>
+        <div>
+          <label className="label-text">Time Spent</label>
           <input
-            type="time"
-            value={task.endTime}
-            onChange={(e) => onUpdate("endTime", e.target.value)}
+            type="text"
+            placeholder="1:30"
+            value={task.timeSpent}
+            onChange={(e) => onUpdate("timeSpent", e.target.value)}
             className="field"
           />
         </div>
         <div>
-          <label className="label-text">Planned (mins)</label>
-          <input
-            type="number"
-            min="0"
-            step="1"
-            placeholder="e.g. 30"
-            value={task.plannedMinutes}
-            onChange={(e) => onUpdate("plannedMinutes", e.target.value)}
-            className="field"
-          />
-        </div>
-        <div>
-          <label className="label-text">Status</label>
+          <label className="label-text">Task Status</label>
           <select
             value={task.status}
             onChange={(e) => onUpdate("status", e.target.value)}
@@ -237,145 +198,6 @@ export default function TaskCard({
           </select>
         </div>
       </div>
-
-      {/* === "More Details" toggle for less-used fields === */}
-      {!showDetails ? (
-        <button
-          type="button"
-          onClick={() => setShowDetails(true)}
-          className="text-sm text-gray-400 hover:text-indigo-500 font-medium transition-colors flex items-center gap-1.5"
-        >
-          <Settings2 className="w-3.5 h-3.5" />
-          More Details
-        </button>
-      ) : (
-        <div className="space-y-4 animate-fade-in border-t border-gray-100 pt-4">
-          <div className="flex items-center justify-between">
-            <span className="label-text mb-0">Additional Details</span>
-            <button
-              type="button"
-              onClick={() => setShowDetails(false)}
-              className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              Hide
-            </button>
-          </div>
-
-          {/* Date, Category, Priority */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="label-text">Date</label>
-              <input
-                type="date"
-                value={task.date}
-                onChange={(e) => onUpdate("date", e.target.value)}
-                className="field"
-              />
-            </div>
-            <div>
-              <label className="label-text">Category</label>
-              <input
-                type="text"
-                value={task.category}
-                onChange={(e) => onUpdate("category", e.target.value)}
-                className="field"
-              />
-            </div>
-            <div>
-              <label className="label-text">Priority</label>
-              <select
-                value={task.priority}
-                onChange={(e) => onUpdate("priority", e.target.value)}
-                className="field"
-              >
-                {PRIORITIES.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Computed fields */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="label-text">Planned (hrs)</label>
-              <input
-                type="text"
-                readOnly
-                value={task.totalPlannedTime}
-                className="field bg-gray-50 cursor-not-allowed text-gray-500"
-              />
-            </div>
-            <div>
-              <label className="label-text">Actual (hrs)</label>
-              <input
-                type="text"
-                readOnly
-                value={task.actualTime}
-                className="field bg-gray-50 cursor-not-allowed text-gray-500"
-              />
-            </div>
-          </div>
-
-          {/* Notes & Deviations */}
-          {!showNotes ? (
-            <button
-              type="button"
-              onClick={() => setShowNotes(true)}
-              className="text-sm text-indigo-500 hover:text-indigo-700 font-medium transition-colors flex items-center gap-1"
-            >
-              + Add Notes & Deviations
-            </button>
-          ) : (
-            <div className="space-y-4 animate-fade-in">
-              <div className="flex items-center justify-between">
-                <span className="label-text mb-0">Notes & Deviations</span>
-                <button
-                  type="button"
-                  onClick={() => setShowNotes(false)}
-                  className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  Hide
-                </button>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="label-text">Remarks</label>
-                  <input
-                    type="text"
-                    placeholder="Additional notes"
-                    value={task.remarks}
-                    onChange={(e) => onUpdate("remarks", e.target.value)}
-                    className="field"
-                  />
-                </div>
-                <div>
-                  <label className="label-text">Dependencies</label>
-                  <input
-                    type="text"
-                    placeholder="Blocked by..."
-                    value={task.dependencies}
-                    onChange={(e) => onUpdate("dependencies", e.target.value)}
-                    className="field"
-                  />
-                </div>
-                <div>
-                  <label className="label-text">Deviations</label>
-                  <input
-                    type="text"
-                    placeholder="Any deviations"
-                    value={task.deviations}
-                    onChange={(e) => onUpdate("deviations", e.target.value)}
-                    className="field"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }

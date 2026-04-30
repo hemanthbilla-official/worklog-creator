@@ -1,83 +1,83 @@
 import { useState } from "react";
-import {
-  ChevronDown,
-  ChevronUp,
-  Sparkles,
-  Settings,
-  Loader2,
-  AlertCircle,
-} from "lucide-react";
+import { Sparkles, Settings, Loader2, AlertCircle, Play } from "lucide-react";
 import { useGeminiKey } from "@/hooks/useGeminiKey";
 import type { Task } from "@/types";
-import type { HistoryEntry } from "@/hooks/useTaskHistory";
+import { normalizeStatus } from "@/constants";
+import { decimalHoursToTimeSpent } from "@/utils";
 
 interface AIQuickLogProps {
   globalDate: string;
   onGenerate: (overrides: Partial<Task>[]) => void;
-  history: HistoryEntry[];
 }
 
 const GEMINI_URL =
   "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent";
 
-function buildHistoryContext(history: HistoryEntry[]): string {
-  if (history.length === 0) return "";
-  const recent = history.slice(-15);
-  const lines = recent.map(
-    (h) =>
-      `- "${h.task}" (${h.category}, ${h.priority}, ~${h.plannedMinutes || "?"}min)`,
-  );
-  return `\n\nHere are the user's recent/frequent tasks for context. Use these to infer times, categories, and priorities when the user is vague:\n${lines.join("\n")}`;
-}
-
-function buildSystemPrompt(
-  todayFormatted: string,
-  history: HistoryEntry[],
-): string {
-  const historyBlock = buildHistoryContext(history);
-
-  return `You are a smart worklog assistant. The user will describe their day casually — sometimes with full details, sometimes very vaguely (e.g. "standup, 2 classes, helped students"). Your job is to turn that into structured worklog entries.
+function buildSystemPrompt(todayFormatted: string): string {
+  return `You are a smart worklog assistant. The user will describe their day casually, sometimes with full details and sometimes vaguely (for example: "standup, 2 classes, helped students"). Turn that into four-column worklog entries for Google Sheets.
 
 Key behaviors:
-- If the user gives times, use them exactly.
-- If the user is vague about times, infer reasonable times based on their history patterns below. Space tasks logically throughout the day (e.g. standup early morning, classes mid-morning, etc).
-- If you truly cannot infer a time, leave startTime and endTime as "".
-- Category defaults to "NIAT" unless specified.
-- Priority defaults to "High" unless specified.
+- Return only these four fields: date, task, timeSpent, status.
+- If the user enters multiple lines, treat each non-empty line as a separate worklog row. Do not merge lines.
+- Correct obvious spelling and capitalization mistakes in the final task text, such as "REact" to "React", "Ib3" to "IB3", "compeleted" to "completed", and "Praticipitated" to "Participated".
+- The task field must be detailed and specific enough to paste directly into the Tasks column.
+- Do NOT use single-word or overly short task names like "Class", "Standup", "Meeting", or "Doubts".
+- Expand casual inputs into very detailed task descriptions. The user's wording is only a reference, not the final detail level.
+- Each task should usually be 14-28 words and include the action, audience or context, topic/activity, and useful outcome when inferable.
+- For example, "Class" becomes "Conduct React class for students covering component state, event handling, live examples, and doubt clarification" when that intent is clear.
+- If the user gives a duration, convert it to H:MM format for timeSpent (examples: 15 minutes = "0:15", 1 hour = "1:00", 90 minutes = "1:30").
+- If the user gives a start/end time range, calculate the duration and use H:MM for timeSpent.
+- Treat phrases like "time took 1 hr", "took 1 hour", "spent 45 mins", or "for 30 minutes" as duration signals.
+- If the user is vague about duration, infer a reasonable Time Spent from the task context.
+- If you truly cannot infer Time Spent, leave timeSpent as "".
 - Date defaults to "${todayFormatted}" unless specified.
 
-Status rules (VERY IMPORTANT — read the user's intent):
+Status rules:
 - Default status is "Not Done".
-- If the user says "done", "completed", "finished", "over", or uses past tense (e.g. "took class", "had standup", "cleared doubts"), set status to "Completed".
-- If the user says "in progress", "doing", "working on", "ongoing", set status to "In Progress".
-- If the user says "pending", "not done", "yet to start", "will do", "need to", set status to "Not Done" or "Yet to Start".
-- If the user says "on hold", "blocked", "waiting", set status to "On Hold".
-- If the user says "carry forward", "tomorrow", "postpone", set status to "Carry Forward".
+- If the user says "done", "complete", "completed", "compeleted", "finished", "over", or uses past tense (for example "took class", "conducted class", "had standup", "cleared doubts"), set status to "Completed".
+- If the user says "in progress", "doing", "working on", or "ongoing", set status to "In Progress".
+- If the user says "pending", "not done", "yet to start", "will do", or "need to", set status to "Not Done" or "Yet to Start".
+- If the user says "on hold", "blocked", or "waiting", set status to "On Hold".
+- If the user says "carry forward", "tomorrow", or "postpone", set status to "Carry Forward".
 - Valid statuses are ONLY: "Completed", "Not Done", "Yet to Start", "On Hold", "In Progress", "Carry Forward".
-- Understand the user's intent — e.g. "Class 8:30 to 9:30 done" means status is "Completed".
 
-Outcome rules (IMPORTANT):
-- Write DETAILED, SPECIFIC outcomes — not generic ones.
-- Use present/future tense. Never use past tense or words ending in -ed.
-- BAD: "Class delivered", "Sync completed", "Doubts resolved"
-- GOOD: "Deliver interactive session on the scheduled topic, covering key concepts with live coding examples and Q&A"
-- GOOD: "Conduct daily standup to sync on progress, blockers, and priorities for the day"
-- GOOD: "Provide one-on-one doubt clearing support to students, addressing conceptual gaps and debugging issues"
-- Each outcome should be 1-2 sentences, specific to the task.${historyBlock}
+Return ONLY a raw JSON array, with no markdown fences, explanation, or extra text:
+[{ "date": "YYYY-MM-DD", "task": "string", "timeSpent": "H:MM e.g. 1:30", "status": "Completed or Not Done etc" }]
 
-Return ONLY a raw JSON array — no markdown fences, no explanation, no extra text:
-[{ "date": "YYYY-MM-DD", "task": "string", "category": "NIAT", "outcome": "detailed specific outcome in present/future tense", "priority": "High", "status": "Completed or Not Done etc", "totalPlannedTime": "decimal hours e.g. 1.50", "startTime": "HH:mm (24h)", "endTime": "HH:mm (24h)", "actualTime": "decimal hours e.g. 1.50", "remarks": "", "dependencies": "", "deviations": "" }]
+Example:
+User input: Conducted Practice session for S2 time took 1 hr and completed the task
+Output: [{ "date": "${todayFormatted}", "task": "Conduct practice session for S2 students with guided problem solving, exercise walkthroughs, and doubt clarification", "timeSpent": "1:00", "status": "Completed" }]
+
+Multi-line example:
+User input:
+Conducted Practice session for S2 time took 1 hr and completed the task
+Conducted React Class for IB2 time took 1hr completed
+Invigilation for DSA exam 1hr 30 minutes complete
+Conducted React Class for S2 1hr completed
+Working on project and adding new versions 1hr completed
+Conducted REact class for Ib3 and 6 1hr compeleted
+Praticipitated in Learning Hours in progress 15 minutes
+
+Output:
+[
+  { "date": "${todayFormatted}", "task": "Conduct practice session for S2 students with guided problem solving, exercise walkthroughs, and doubt clarification", "timeSpent": "1:00", "status": "Completed" },
+  { "date": "${todayFormatted}", "task": "Conduct React class for IB2 students covering key concepts, practical examples, and student doubt clarification", "timeSpent": "1:00", "status": "Completed" },
+  { "date": "${todayFormatted}", "task": "Invigilate DSA examination by monitoring students, maintaining exam discipline, and supporting smooth assessment completion", "timeSpent": "1:30", "status": "Completed" },
+  { "date": "${todayFormatted}", "task": "Conduct React class for S2 students with concept explanation, hands-on examples, and interactive Q&A support", "timeSpent": "1:00", "status": "Completed" },
+  { "date": "${todayFormatted}", "task": "Work on project enhancements by adding new version updates, refining functionality, and validating implementation changes", "timeSpent": "1:00", "status": "Completed" },
+  { "date": "${todayFormatted}", "task": "Conduct React class for IB3 and IB6 students with topic explanation, examples, and doubt clarification", "timeSpent": "1:00", "status": "Completed" },
+  { "date": "${todayFormatted}", "task": "Participate in Learning Hours session to engage with ongoing discussions, learning activities, and collaborative knowledge sharing", "timeSpent": "0:15", "status": "In Progress" }
+]
 
 Rules:
-- startTime and endTime must be in 24-hour HH:mm format (e.g. "09:30", "14:00")
-- totalPlannedTime and actualTime = duration in hours as decimal string (e.g. "0.50", "2.00")
-- If no end time can be inferred, leave endTime as "" and set totalPlannedTime and actualTime to ""
+- task must be a very detailed description, not a single word, bare category, or lightly edited copy of the user's shorthand.
+- timeSpent must be H:MM when present. Do not use decimal hours.
+- one input line should produce exactly one output object unless the line clearly contains multiple separate tasks.
 - Output ONLY the JSON array. No other text whatsoever.`;
 }
 
 function stripMarkdownFences(text: string): string {
   let cleaned = text.trim();
-  // Remove ```json ... ``` or ``` ... ```
   if (cleaned.startsWith("```")) {
     cleaned = cleaned
       .replace(/^```(?:json)?\s*\n?/, "")
@@ -86,13 +86,16 @@ function stripMarkdownFences(text: string): string {
   return cleaned.trim();
 }
 
+function normalizeGeneratedTimeSpent(value: string): string {
+  const normalized = decimalHoursToTimeSpent(value);
+  return normalized || value.trim();
+}
+
 export default function AIQuickLog({
   globalDate,
   onGenerate,
-  history,
 }: AIQuickLogProps) {
   const { apiKey, setApiKey, hasKey } = useGeminiKey();
-  const [isOpen, setIsOpen] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -114,7 +117,7 @@ export default function AIQuickLog({
               parts: [
                 {
                   text:
-                    buildSystemPrompt(globalDate, history) +
+                    buildSystemPrompt(globalDate) +
                     "\n\nUser input:\n" +
                     input.trim(),
                 },
@@ -156,30 +159,12 @@ export default function AIQuickLog({
         throw new Error("AI returned an empty or invalid array");
       }
 
-      // Map to Partial<Task> — compute plannedMinutes from totalPlannedTime
-      const taskOverrides: Partial<Task>[] = parsed.map((item) => {
-        const planned = parseFloat(item.totalPlannedTime || "0");
-        const plannedMinutes = isNaN(planned)
-          ? ""
-          : String(Math.round(planned * 60));
-
-        return {
-          date: item.date || globalDate,
-          task: item.task || "",
-          category: item.category || "NIAT",
-          outcome: item.outcome || "",
-          priority: item.priority || "High",
-          status: item.status || "Not Done",
-          plannedMinutes,
-          totalPlannedTime: isNaN(planned) ? "" : planned.toFixed(2),
-          startTime: item.startTime || "",
-          endTime: item.endTime || "",
-          actualTime: item.actualTime || "",
-          remarks: item.remarks || "",
-          dependencies: item.dependencies || "",
-          deviations: item.deviations || "",
-        };
-      });
+      const taskOverrides: Partial<Task>[] = parsed.map((item) => ({
+        date: item.date || globalDate,
+        task: item.task || "",
+        timeSpent: normalizeGeneratedTimeSpent(item.timeSpent || ""),
+        status: normalizeStatus(item.status || "Not Done"),
+      }));
 
       onGenerate(taskOverrides);
       setInput("");
@@ -191,149 +176,86 @@ export default function AIQuickLog({
   };
 
   return (
-    <div className="ai-quicklog glass-card overflow-hidden">
-      {/* Header toggle */}
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-5 py-4 flex items-center justify-between hover:bg-gray-50/50 transition-colors"
-      >
-        <div className="flex items-center gap-2.5">
-          <Sparkles className="w-4 h-4 text-violet-500" />
-          <span className="text-sm font-semibold text-gray-700">
-            AI Quick Log
+    <div className="h-full flex flex-col bg-white">
+      <div className="h-12 shrink-0 border-b border-[#d8deea] bg-[#fbfcff] flex items-center justify-between gap-3 px-4">
+        <div className="flex items-center gap-2 min-w-0">
+          <Sparkles className="w-4 h-4 text-blue-600 shrink-0" />
+          <span className="text-sm font-semibold text-[#4b5579] truncate">
+            worklog-input
           </span>
-          {!hasKey && (
-            <span className="text-[10px] font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
-              API Key Required
-            </span>
-          )}
         </div>
-        {isOpen ? (
-          <ChevronUp className="w-4 h-4 text-gray-400" />
-        ) : (
-          <ChevronDown className="w-4 h-4 text-gray-400" />
-        )}
-      </button>
 
-      {/* Collapsible body */}
-      {isOpen && (
-        <div className="px-5 pb-5 space-y-4 animate-fade-in border-t border-gray-100">
-          {/* Settings toggle */}
-          <div className="pt-3">
-            <button
-              type="button"
-              onClick={() => setShowSettings(!showSettings)}
-              className="text-xs text-gray-400 hover:text-gray-600 transition-colors flex items-center gap-1"
-            >
-              <Settings className="w-3 h-3" />
-              {showSettings ? "Hide Settings" : "API Key Settings"}
-            </button>
-
-            {showSettings && (
-              <div className="mt-2 animate-fade-in">
-                <label className="label-text">Gemini API Key</label>
-                <input
-                  type="password"
-                  placeholder="Paste your Gemini API key here..."
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  className="field font-mono text-xs"
-                />
-                <p className="mt-1 text-[11px] text-gray-400">
-                  Your key is stored locally in this browser only.
-                </p>
-              </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => setShowSettings(!showSettings)}
+            className="h-9 w-9 inline-flex items-center justify-center rounded border border-[#d8deea] text-[#7b83a6] hover:bg-[#f3f6ff] hover:text-blue-600 transition-colors"
+            title="API key settings"
+          >
+            <Settings className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={handleGenerate}
+            disabled={!hasKey || !input.trim() || loading}
+            className="h-9 inline-flex items-center gap-2 rounded bg-blue-600 px-5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Running
+              </>
+            ) : (
+              <>
+                <Play className="w-4 h-4" />
+                Run
+              </>
             )}
-          </div>
+          </button>
+        </div>
+      </div>
 
-          {/* Text area */}
-          <div>
-            <textarea
-              rows={3}
-              placeholder={
-                "Just describe your day casually...\ne.g., standup, 2 classes, helped students after lunch\nor: took react class 10:30-12:30, doubt clearing"
-              }
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              disabled={loading}
-              className="field !h-auto py-2.5 resize-y leading-relaxed"
-            />
-          </div>
-
-          {/* Error message */}
-          {error && (
-            <div className="flex items-start gap-2 text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
-              <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-              <span>{error}</span>
-            </div>
-          )}
-
-          {/* Generate button + warning */}
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={handleGenerate}
-              disabled={!hasKey || !input.trim() || loading}
-              className="btn-primary !py-2 !px-4 !text-sm"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Thinking...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4" />
-                  Generate Tasks
-                </>
-              )}
-            </button>
-
-            {!hasKey && (
-              <span className="text-xs text-amber-600 flex items-center gap-1">
-                <AlertCircle className="w-3 h-3" />
-                Add your Gemini API key in settings to enable
-              </span>
-            )}
-          </div>
-
-          {/* Recent Tasks */}
-          {history.length > 0 && (
-            <div className="space-y-2">
-              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                Recent Tasks
-              </span>
-              <div className="flex flex-wrap gap-2">
-                {history
-                  .slice(-10)
-                  .reverse()
-                  .map((h) => (
-                    <button
-                      key={h.task}
-                      type="button"
-                      onClick={() =>
-                        onGenerate([
-                          {
-                            date: globalDate,
-                            task: h.task,
-                            outcome: h.outcome,
-                            category: h.category,
-                            priority: h.priority,
-                            plannedMinutes: h.plannedMinutes,
-                          },
-                        ])
-                      }
-                      className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-indigo-50 hover:text-indigo-600 rounded-full border border-gray-200 hover:border-indigo-200 transition-all cursor-pointer"
-                    >
-                      {h.task}
-                    </button>
-                  ))}
-              </div>
-            </div>
-          )}
+      {showSettings && (
+        <div className="shrink-0 px-4 py-3 border-b border-[#d8deea] bg-[#fbfcff] animate-fade-in">
+          <label className="label-text">Gemini API Key</label>
+          <input
+            type="password"
+            placeholder="Paste your Gemini API key here..."
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            className="field font-mono text-xs"
+          />
+          <p className="mt-1 text-[11px] text-gray-400">
+            Your key is stored locally in this browser only.
+          </p>
         </div>
       )}
+
+      {!hasKey && (
+        <div className="shrink-0 flex items-center gap-2 border-b border-amber-100 bg-amber-50 px-4 py-2 text-xs text-amber-700">
+          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+          <span>Add your Gemini API key in settings to enable Run.</span>
+        </div>
+      )}
+
+      {error && (
+        <div className="shrink-0 flex items-start gap-2 border-b border-red-100 bg-red-50 px-4 py-2 text-xs text-red-600">
+          <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      <div className="min-h-0 flex-1 bg-white">
+        <textarea
+          placeholder={
+            "Paste one task per line...\nConducted Practice session for S2 time took 1 hr and completed the task\nConducted React Class for IB2 time took 1hr completed\nPraticipitated in Learning Hours in progress 15 minutes"
+          }
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          disabled={loading}
+          className="h-full w-full resize-none border-0 bg-white px-4 py-4 font-mono text-sm leading-6 text-[#1f2537] outline-none placeholder:text-[#a4abc2] disabled:opacity-70"
+        />
+      </div>
     </div>
   );
 }

@@ -2,18 +2,8 @@ export interface Task {
   id: string;
   date: string;
   task: string;
-  category: string;
-  outcome: string;
-  priority: string;
   status: string;
-  plannedMinutes: string;
-  totalPlannedTime: string;
-  startTime: string;
-  endTime: string;
-  actualTime: string;
-  remarks: string;
-  dependencies: string;
-  deviations: string;
+  timeSpent: string;
 }
 
 export interface TaskTemplate {
@@ -35,18 +25,8 @@ export function createTask(overrides?: Partial<Task>): Task {
     id: uid(),
     date,
     task: "",
-    category: "NIAT",
-    outcome: "",
-    priority: "Medium",
     status: "Yet to Start",
-    plannedMinutes: "",
-    totalPlannedTime: "",
-    startTime: "",
-    endTime: "",
-    actualTime: "",
-    remarks: "",
-    dependencies: "",
-    deviations: "",
+    timeSpent: "",
     ...overrides,
   };
 }

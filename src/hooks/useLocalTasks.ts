@@ -10,13 +10,25 @@ function todayDateString(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+function isTask(value: unknown): value is Task {
+  if (!value || typeof value !== "object") return false;
+  const record = value as Record<string, unknown>;
+
+  return (
+    typeof record.id === "string" &&
+    typeof record.date === "string" &&
+    typeof record.task === "string" &&
+    typeof record.status === "string" &&
+    typeof record.timeSpent === "string"
+  );
+}
+
 function loadTasks(): Task[] {
   if (typeof window === "undefined") return [];
 
   const today = todayDateString();
   const lastDate = localStorage.getItem(DATE_KEY);
 
-  // Midnight reset — if current date is strictly after stored date, clear tasks
   if (lastDate && today > lastDate) {
     localStorage.removeItem(TASKS_KEY);
     localStorage.setItem(DATE_KEY, today);
@@ -26,44 +38,41 @@ function loadTasks(): Task[] {
   localStorage.setItem(DATE_KEY, today);
 
   const raw = localStorage.getItem(TASKS_KEY);
-  if (raw) {
-    try {
-      return JSON.parse(raw) as Task[];
-    } catch {
-      return [];
-    }
+  if (!raw) return [];
+
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(isTask);
+  } catch {
+    return [];
   }
-  return [];
 }
 
 export function useLocalTasks() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [hydrated, setHydrated] = useState(false);
 
-  // Hydrate from localStorage on mount (client only)
   useEffect(() => {
-    const saved = loadTasks().filter((t) => t.task?.trim());
-    setTasks(saved);
+    setTasks(loadTasks());
     setHydrated(true);
   }, []);
 
-  // Auto-save to localStorage on every change (after hydration)
   useEffect(() => {
     if (!hydrated) return;
+
     localStorage.setItem(TASKS_KEY, JSON.stringify(tasks));
     localStorage.setItem(DATE_KEY, todayDateString());
   }, [tasks, hydrated]);
 
-  const addTask = useCallback((defaults?: Partial<Task>) => {
-    setTasks((prev) => [...prev, createTask(defaults)]);
-  }, []);
-
   const addMultipleTasks = useCallback((overridesArray: Partial<Task>[]) => {
+    const newTasks = overridesArray.map((overrides) => createTask(overrides));
     setTasks((prev) => [
-      // Remove untouched empty tasks so AI-generated ones don't sit beside blanks
-      ...prev.filter((t) => t.task || t.outcome || t.startTime || t.endTime),
-      ...overridesArray.map((overrides) => createTask(overrides)),
+      ...prev.filter((t) => t.task || t.timeSpent),
+      ...newTasks,
     ]);
+
+    return newTasks;
   }, []);
 
   const updateTask = useCallback(
@@ -86,7 +95,6 @@ export function useLocalTasks() {
   return {
     tasks,
     hydrated,
-    addTask,
     addMultipleTasks,
     updateTask,
     removeTask,
