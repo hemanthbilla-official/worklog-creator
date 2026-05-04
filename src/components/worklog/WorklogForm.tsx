@@ -265,8 +265,8 @@ export default function WorklogForm() {
 
   if (!hydrated) {
     return (
-      <div className="h-screen w-full flex items-center justify-center bg-white">
-        <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      <div className="loading-state" role="status" aria-label="Loading worklog">
+        <div className="ledger-spinner" />
       </div>
     );
   }
@@ -277,40 +277,40 @@ export default function WorklogForm() {
   } as CSSProperties;
 
   return (
-    <div className="h-screen w-full flex flex-col overflow-hidden bg-white text-[#1f2537]">
-      <header className="h-[54px] shrink-0 border-b border-[#d8deea] bg-white flex items-center justify-between gap-4 px-4">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="flex h-8 w-8 items-center justify-center rounded bg-blue-600 text-sm font-black text-white">
-            W
+    <div className="workbench">
+      <header className="workbench-header">
+        <div className="brand-lockup">
+          <div className="brand-mark" aria-hidden="true">
+            WL
           </div>
-          <div className="min-w-0">
-            <h1 className="truncate text-base font-semibold text-[#2d3558]">
-              Worklog Creator
-            </h1>
+          <div>
+            <h1 className="brand-title">Worklog Ledger</h1>
+            <p className="brand-subtitle">sheet-ready daily rows</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="header-actions">
           <input
             type="date"
             value={globalDate}
             onChange={(event) => setGlobalDate(event.target.value)}
-            className="field !h-9 w-40"
+            className="field header-date-field"
+            aria-label="Default date for generated tasks"
           />
           <button
             type="button"
             onClick={handleCopy}
             disabled={!hasCopyableTasks}
-            className="h-9 inline-flex items-center gap-2 rounded border border-blue-600 px-4 text-sm font-semibold text-blue-600 hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="btn-primary"
           >
             {copyState === "copied" ? (
               <>
-                <Check className="w-4 h-4" />
+                <Check className="h-4 w-4" />
                 Copied
               </>
             ) : (
               <>
-                <ClipboardCopy className="w-4 h-4" />
+                <ClipboardCopy className="h-4 w-4" />
                 Copy
               </>
             )}
@@ -324,20 +324,16 @@ export default function WorklogForm() {
               }
             }}
             disabled={tasks.length === 0}
-            className="h-9 inline-flex items-center gap-2 rounded border border-[#d8deea] px-4 text-sm font-medium text-[#5d668b] hover:bg-[#f6f8fc] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="btn-secondary danger-button"
           >
-            <Trash2 className="w-4 h-4" />
+            <Trash2 className="h-4 w-4" />
             Clear
           </button>
         </div>
       </header>
 
-      <div
-        ref={splitPaneRef}
-        className="min-h-0 flex-1 grid grid-cols-1 lg:grid-cols-[minmax(320px,var(--left-pane-width))_8px_minmax(420px,1fr)]"
-        style={splitPaneStyle}
-      >
-        <section className="min-h-0">
+      <div ref={splitPaneRef} className="split-pane" style={splitPaneStyle}>
+        <section className="pane" aria-label="Worklog input">
           <AIQuickLog globalDate={globalDate} onGenerate={handleAIGenerate} />
         </section>
 
@@ -352,50 +348,48 @@ export default function WorklogForm() {
           onPointerCancel={handleDividerPointerUp}
           onDoubleClick={() => setLeftPanePct(50)}
           onKeyDown={handleDividerKeyDown}
-          className="hidden lg:block cursor-col-resize bg-[#d8deea] hover:bg-blue-500 focus:bg-blue-500 focus:outline-none transition-colors"
+          className="split-divider"
           title="Drag to resize panes. Double-click to reset."
         />
 
-        <section className="min-h-0 flex flex-col bg-[#fbfcff]">
-          <div className="h-12 shrink-0 border-b border-[#d8deea] bg-white flex items-center justify-between gap-3 px-4">
-            <div className="flex items-center gap-3 min-w-0">
-              <span className="text-sm font-semibold text-[#4b5579]">
-                Output
-              </span>
-              <span className="rounded bg-[#eef2ff] px-2 py-0.5 text-xs font-semibold text-blue-700">
+        <section className="pane output-pane" aria-label="Generated worklog rows">
+          <div className="pane-head">
+            <div className="pane-title">
+              <span>Output</span>
+              <span className="count-stamp" aria-label={`${tasks.length} tasks`}>
                 {tasks.length}
               </span>
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="pane-tools">
               <button
                 type="button"
                 onClick={handleExpandAll}
                 disabled={tasks.length === 0}
-                className="h-9 w-9 inline-flex items-center justify-center rounded border border-[#d8deea] text-[#7b83a6] hover:bg-[#f3f6ff] hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="icon-button"
                 title="Expand all"
+                aria-label="Expand all tasks"
               >
-                <Maximize2 className="w-4 h-4" />
+                <Maximize2 className="h-4 w-4" />
               </button>
               <button
                 type="button"
                 onClick={handleCollapseAll}
                 disabled={tasks.length === 0}
-                className="h-9 w-9 inline-flex items-center justify-center rounded border border-[#d8deea] text-[#7b83a6] hover:bg-[#f3f6ff] hover:text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="icon-button"
                 title="Collapse all"
+                aria-label="Collapse all tasks"
               >
-                <Minimize2 className="w-4 h-4" />
+                <Minimize2 className="h-4 w-4" />
               </button>
             </div>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto p-4">
+          <div className="task-list-wrap">
             {tasks.length === 0 ? (
-              <div className="h-full min-h-[360px] flex items-center justify-center border border-dashed border-[#d8deea] bg-white text-sm text-[#8d95b3]">
-                Output will appear here after Run.
-              </div>
+              <div className="empty-ledger">No rows stamped yet.</div>
             ) : (
-              <div className="space-y-3">
+              <div className="task-list">
                 {tasks.map((task, idx) => (
                   <TaskCard
                     key={task.id}
@@ -422,25 +416,22 @@ export default function WorklogForm() {
 
       {previewTask && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4"
+          className="modal-backdrop"
           role="dialog"
           aria-modal="true"
           aria-labelledby="task-preview-title"
           onClick={handleClosePreview}
         >
           <div
-            className="w-full max-w-3xl rounded-lg bg-white shadow-2xl"
+            className="modal-panel"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="flex items-center justify-between gap-4 border-b border-[#d8deea] px-5 py-4">
+            <div className="modal-head">
               <div>
-                <h2
-                  id="task-preview-title"
-                  className="text-base font-semibold text-[#2d3558]"
-                >
+                <h2 id="task-preview-title" className="modal-title">
                   Task Details
                 </h2>
-                <p className="mt-1 text-xs font-medium text-[#7b83a6]">
+                <p className="modal-summary">
                   {previewDraft.date} | {previewDraft.startTime || "--:--"}-
                   {previewDraft.endTime || "--:--"} |{" "}
                   {previewDraft.timeSpent || "No time"} |{" "}
@@ -450,15 +441,16 @@ export default function WorklogForm() {
               <button
                 type="button"
                 onClick={handleClosePreview}
-                className="h-9 w-9 inline-flex items-center justify-center rounded border border-[#d8deea] text-[#7b83a6] hover:bg-[#f6f8fc] hover:text-[#2d3558] transition-colors"
+                className="icon-button"
                 title="Close"
+                aria-label="Close task details"
               >
-                <X className="w-4 h-4" />
+                <X className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="px-5 py-5 space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="modal-body">
+              <div className="modal-grid-two">
                 <div>
                   <label className="label-text">Date</label>
                   <input
@@ -505,12 +497,12 @@ export default function WorklogForm() {
                     }))
                   }
                   rows={7}
-                  className="field !h-auto resize-y py-3 text-base leading-7"
+                  className="field textarea-field"
                   autoFocus
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="modal-grid-three">
                 <div>
                   <label className="label-text">Start Time</label>
                   <input
@@ -557,18 +549,18 @@ export default function WorklogForm() {
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3">
+              <div className="modal-actions">
                 <button
                   type="button"
                   onClick={handleClosePreview}
-                  className="h-10 rounded border border-[#d8deea] px-4 text-sm font-medium text-[#5d668b] hover:bg-[#f6f8fc] transition-colors"
+                  className="plain-button"
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
                   onClick={handleSavePreview}
-                  className="h-10 rounded bg-blue-600 px-5 text-sm font-semibold text-white hover:bg-blue-700 transition-colors"
+                  className="btn-primary"
                 >
                   Update Task
                 </button>

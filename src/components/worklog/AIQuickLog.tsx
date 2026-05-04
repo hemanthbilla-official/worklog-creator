@@ -255,38 +255,38 @@ export default function AIQuickLog({
   };
 
   return (
-    <div className="h-full flex flex-col bg-white">
-      <div className="h-12 shrink-0 border-b border-[#d8deea] bg-[#fbfcff] flex items-center justify-between gap-3 px-4">
-        <div className="flex items-center gap-2 min-w-0">
-          <Sparkles className="w-4 h-4 text-blue-600 shrink-0" />
-          <span className="text-sm font-semibold text-[#4b5579] truncate">
-            worklog-input
-          </span>
+    <div className="input-pane">
+      <div className="pane-head">
+        <div className="pane-title">
+          <Sparkles className="h-4 w-4" />
+          <span>worklog-input</span>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="pane-tools">
           <button
             type="button"
             onClick={() => setShowSettings(!showSettings)}
-            className="h-9 w-9 inline-flex items-center justify-center rounded border border-[#d8deea] text-[#7b83a6] hover:bg-[#f3f6ff] hover:text-blue-600 transition-colors"
+            className="icon-button"
             title="API key settings"
+            aria-label="API key settings"
+            aria-pressed={showSettings}
           >
-            <Settings className="w-4 h-4" />
+            <Settings className="h-4 w-4" />
           </button>
           <button
             type="button"
             onClick={handleGenerate}
             disabled={!hasKey || !input.trim() || loading}
-            className="h-9 inline-flex items-center gap-2 rounded bg-blue-600 px-5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="run-button"
           >
             {loading ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin" />
                 Running
               </>
             ) : (
               <>
-                <Play className="w-4 h-4" />
+                <Play className="h-4 w-4" />
                 Run
               </>
             )}
@@ -295,44 +295,44 @@ export default function AIQuickLog({
       </div>
 
       {showSettings && (
-        <div className="shrink-0 px-4 py-3 border-b border-[#d8deea] bg-[#fbfcff] animate-fade-in">
+        <div className="settings-sheet">
           <label className="label-text">Gemini API Key</label>
           <input
             type="password"
             placeholder="Paste your Gemini API key here..."
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
-            className="field font-mono text-xs"
+            className="field"
           />
-          <p className="mt-1 text-[11px] text-gray-400">
+          <p className="helper-text">
             Your key is stored locally in this browser only.
           </p>
         </div>
       )}
 
       {!hasKey && (
-        <div className="shrink-0 flex items-center gap-2 border-b border-amber-100 bg-amber-50 px-4 py-2 text-xs text-amber-700">
-          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+        <div className="notice notice-warning">
+          <AlertCircle className="h-4 w-4" />
           <span>Add your Gemini API key in settings to enable Run.</span>
         </div>
       )}
 
       {error && (
-        <div className="shrink-0 flex items-start gap-2 border-b border-red-100 bg-red-50 px-4 py-2 text-xs text-red-600">
-          <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+        <div className="notice notice-error">
+          <AlertCircle className="h-4 w-4" />
           <span>{error}</span>
         </div>
       )}
 
-      <div className="min-h-0 flex-1 bg-white">
+      <div className="quicklog-editor">
         <textarea
           placeholder={
-            "Paste one task per line...\nPS session for S2 9 30 to 10 30 completed\nReact class for IB2 1 hour completed\nLearning Hours in progress 15 minutes"
+            "PS session for S2 9 30 to 10 30 completed\nReact class for IB2 1 hour completed\nLearning Hours in progress 15 minutes"
           }
           value={input}
           onChange={(e) => setInput(e.target.value)}
           disabled={loading}
-          className="h-full w-full resize-none border-0 bg-white px-4 py-4 font-mono text-sm leading-6 text-[#1f2537] outline-none placeholder:text-[#a4abc2] disabled:opacity-70"
+          className="quicklog-textarea"
         />
       </div>
     </div>

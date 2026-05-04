@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, type KeyboardEvent } from "react";
 
 interface AutocompleteInputProps {
   value: string;
@@ -19,7 +19,6 @@ export default function AutocompleteInput({
   const [activeIdx, setActiveIdx] = useState(-1);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
-  // Filter suggestions: case-insensitive prefix match, exclude exact match
   const filtered =
     value.trim().length >= 2
       ? suggestions.filter(
@@ -31,7 +30,6 @@ export default function AutocompleteInput({
 
   const showMenu = open && filtered.length > 0;
 
-  // Close on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (
@@ -45,7 +43,6 @@ export default function AutocompleteInput({
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // Reset active index when filtered list changes
   useEffect(() => {
     setActiveIdx(-1);
   }, [filtered.length]);
@@ -55,7 +52,7 @@ export default function AutocompleteInput({
     setOpen(false);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (!showMenu) return;
 
     if (e.key === "ArrowDown") {
@@ -75,7 +72,7 @@ export default function AutocompleteInput({
   };
 
   return (
-    <div ref={wrapperRef} className="relative">
+    <div ref={wrapperRef} className="autocomplete-shell">
       <input
         type="text"
         value={value}
@@ -88,29 +85,26 @@ export default function AutocompleteInput({
         onFocus={() => setOpen(true)}
         onKeyDown={handleKeyDown}
         autoComplete="off"
+        aria-autocomplete="list"
+        aria-expanded={showMenu}
       />
       {showMenu && (
-        <ul
-          className="absolute z-50 left-0 right-0 mt-1 max-h-40 overflow-y-auto rounded-lg border bg-white shadow-lg"
-          style={{
-            borderColor: "var(--border)",
-          }}
-        >
+        <ul className="autocomplete-menu" role="listbox">
           {filtered.slice(0, 8).map((s, i) => (
             <li
               key={s}
+              role="option"
+              aria-selected={i === activeIdx}
               onMouseDown={() => accept(s)}
               onMouseEnter={() => setActiveIdx(i)}
-              className={`px-3 py-2 text-sm cursor-pointer transition-colors ${
-                i === activeIdx
-                  ? "bg-indigo-50 text-indigo-700"
-                  : "text-gray-700 hover:bg-gray-50"
+              className={`autocomplete-option ${
+                i === activeIdx ? "autocomplete-option-active" : ""
               }`}
             >
-              <span className="font-medium">
+              <span className="autocomplete-match">
                 {s.slice(0, value.trim().length)}
               </span>
-              <span className="text-gray-400">
+              <span className="autocomplete-rest">
                 {s.slice(value.trim().length)}
               </span>
             </li>
