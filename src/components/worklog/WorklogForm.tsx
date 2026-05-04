@@ -16,8 +16,8 @@ import {
 } from "lucide-react";
 import type { Task } from "@/types";
 import { useLocalTasks } from "@/hooks/useLocalTasks";
-import { normalizeStatus } from "@/constants";
-import { todayISO } from "@/utils";
+import { normalizeStatus, STATUSES } from "@/constants";
+import { normalizeClockTimeTo12Hour, todayISO } from "@/utils";
 import TaskCard from "./TaskCard";
 import AIQuickLog from "./AIQuickLog";
 
@@ -59,6 +59,11 @@ function formatTimeSpentForSheets(value: string): string {
   return /^\d+:\d{2}$/.test(trimmed) ? `'${trimmed}` : trimmed;
 }
 
+function formatClockTimeForSheets(value: string): string {
+  const normalized = normalizeClockTimeTo12Hour(value);
+  return normalized ? `'${normalized}` : "";
+}
+
 function getCopyableTasks(tasks: Task[]): Task[] {
   return tasks.filter((task) => task.task.trim());
 }
@@ -69,6 +74,8 @@ function buildTSV(tasks: Task[]): string {
       [
         formatDateForSheets(task.date),
         task.task,
+        formatClockTimeForSheets(task.startTime),
+        formatClockTimeForSheets(task.endTime),
         formatTimeSpentForSheets(task.timeSpent),
         normalizeStatus(task.status),
       ]
@@ -76,6 +83,22 @@ function buildTSV(tasks: Task[]): string {
         .join("\t"),
     )
     .join("\n");
+}
+
+type PreviewDraft = Pick<
+  Task,
+  "date" | "task" | "startTime" | "endTime" | "timeSpent" | "status"
+>;
+
+function createPreviewDraft(task?: Task): PreviewDraft {
+  return {
+    date: task?.date || "",
+    task: task?.task || "",
+    startTime: normalizeClockTimeTo12Hour(task?.startTime || ""),
+    endTime: normalizeClockTimeTo12Hour(task?.endTime || ""),
+    timeSpent: task?.timeSpent || "",
+    status: task?.status || "Not Done",
+  };
 }
 
 export default function WorklogForm() {
@@ -95,7 +118,9 @@ export default function WorklogForm() {
   const [globalDate, setGlobalDate] = useState(todayISO());
   const [leftPanePct, setLeftPanePct] = useState(50);
   const [previewTask, setPreviewTask] = useState<Task | null>(null);
-  const [previewDraft, setPreviewDraft] = useState("");
+  const [previewDraft, setPreviewDraft] = useState<PreviewDraft>(
+    createPreviewDraft(),
+  );
 
   useEffect(() => {
     const currentIds = new Set(tasks.map((task) => task.id));
@@ -169,15 +194,32 @@ export default function WorklogForm() {
 
   const handleOpenPreview = (task: Task) => {
     setPreviewTask(task);
-    setPreviewDraft(task.task);
+    setPreviewDraft(createPreviewDraft(task));
+  };
+
+  const handleClosePreview = () => {
+    setPreviewTask(null);
+    setPreviewDraft(createPreviewDraft());
   };
 
   const handleSavePreview = () => {
     if (!previewTask) return;
 
-    updateTask(previewTask.id, "task", previewDraft);
-    setPreviewTask(null);
-    setPreviewDraft("");
+    updateTask(previewTask.id, "date", previewDraft.date);
+    updateTask(previewTask.id, "task", previewDraft.task);
+    updateTask(
+      previewTask.id,
+      "startTime",
+      normalizeClockTimeTo12Hour(previewDraft.startTime),
+    );
+    updateTask(
+      previewTask.id,
+      "endTime",
+      normalizeClockTimeTo12Hour(previewDraft.endTime),
+    );
+    updateTask(previewTask.id, "timeSpent", previewDraft.timeSpent);
+    updateTask(previewTask.id, "status", normalizeStatus(previewDraft.status));
+    handleClosePreview();
   };
 
   const handleCollapseAll = () => {
@@ -236,7 +278,7 @@ export default function WorklogForm() {
 
   return (
     <div className="h-screen w-full flex flex-col overflow-hidden bg-white text-[#1f2537]">
-      <header className="h-13.5 shrink-0 border-b border-[#d8deea] bg-white flex items-center justify-between gap-4 px-4">
+      <header className="h-[54px] shrink-0 border-b border-[#d8deea] bg-white flex items-center justify-between gap-4 px-4">
         <div className="flex items-center gap-3 min-w-0">
           <div className="flex h-8 w-8 items-center justify-center rounded bg-blue-600 text-sm font-black text-white">
             W
@@ -252,8 +294,8 @@ export default function WorklogForm() {
           <input
             type="date"
             value={globalDate}
-            onChange={(e) => setGlobalDate(e.target.value)}
-            className="field h-9! w-40"
+            onChange={(event) => setGlobalDate(event.target.value)}
+            className="field !h-9 w-40"
           />
           <button
             type="button"
@@ -349,7 +391,7 @@ export default function WorklogForm() {
 
           <div className="min-h-0 flex-1 overflow-y-auto p-4">
             {tasks.length === 0 ? (
-              <div className="h-full min-h-90 flex items-center justify-center border border-dashed border-[#d8deea] bg-white text-sm text-[#8d95b3]">
+              <div className="h-full min-h-[360px] flex items-center justify-center border border-dashed border-[#d8deea] bg-white text-sm text-[#8d95b3]">
                 Output will appear here after Run.
               </div>
             ) : (
@@ -384,10 +426,10 @@ export default function WorklogForm() {
           role="dialog"
           aria-modal="true"
           aria-labelledby="task-preview-title"
-          onClick={() => setPreviewTask(null)}
+          onClick={handleClosePreview}
         >
           <div
-            className="w-full max-w-2xl rounded-lg bg-white shadow-2xl"
+            className="w-full max-w-3xl rounded-lg bg-white shadow-2xl"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-center justify-between gap-4 border-b border-[#d8deea] px-5 py-4">
@@ -399,38 +441,126 @@ export default function WorklogForm() {
                   Task Details
                 </h2>
                 <p className="mt-1 text-xs font-medium text-[#7b83a6]">
-                  {previewTask.date} · {previewTask.timeSpent || "No time"} ·{" "}
-                  {normalizeStatus(previewTask.status)}
+                  {previewDraft.date} | {previewDraft.startTime || "--:--"}-
+                  {previewDraft.endTime || "--:--"} |{" "}
+                  {previewDraft.timeSpent || "No time"} |{" "}
+                  {normalizeStatus(previewDraft.status)}
                 </p>
               </div>
               <button
                 type="button"
-                onClick={() => {
-                  setPreviewTask(null);
-                  setPreviewDraft("");
-                }}
+                onClick={handleClosePreview}
                 className="h-9 w-9 inline-flex items-center justify-center rounded border border-[#d8deea] text-[#7b83a6] hover:bg-[#f6f8fc] hover:text-[#2d3558] transition-colors"
                 title="Close"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
+
             <div className="px-5 py-5 space-y-4">
-              <label className="label-text">Tasks</label>
-              <textarea
-                value={previewDraft}
-                onChange={(event) => setPreviewDraft(event.target.value)}
-                rows={7}
-                className="field h-auto! resize-y py-3 text-base leading-7"
-                autoFocus
-              />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="label-text">Date</label>
+                  <input
+                    type="date"
+                    value={previewDraft.date}
+                    onChange={(event) =>
+                      setPreviewDraft((draft) => ({
+                        ...draft,
+                        date: event.target.value,
+                      }))
+                    }
+                    className="field"
+                  />
+                </div>
+                <div>
+                  <label className="label-text">Task Status</label>
+                  <select
+                    value={previewDraft.status}
+                    onChange={(event) =>
+                      setPreviewDraft((draft) => ({
+                        ...draft,
+                        status: event.target.value,
+                      }))
+                    }
+                    className="field"
+                  >
+                    {STATUSES.map((status) => (
+                      <option key={status} value={status}>
+                        {status}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="label-text">Tasks</label>
+                <textarea
+                  value={previewDraft.task}
+                  onChange={(event) =>
+                    setPreviewDraft((draft) => ({
+                      ...draft,
+                      task: event.target.value,
+                    }))
+                  }
+                  rows={7}
+                  className="field !h-auto resize-y py-3 text-base leading-7"
+                  autoFocus
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="label-text">Start Time</label>
+                  <input
+                    type="text"
+                    placeholder="8:30 AM"
+                    value={previewDraft.startTime}
+                    onChange={(event) =>
+                      setPreviewDraft((draft) => ({
+                        ...draft,
+                        startTime: event.target.value,
+                      }))
+                    }
+                    className="field"
+                  />
+                </div>
+                <div>
+                  <label className="label-text">End Time</label>
+                  <input
+                    type="text"
+                    placeholder="9:30 AM"
+                    value={previewDraft.endTime}
+                    onChange={(event) =>
+                      setPreviewDraft((draft) => ({
+                        ...draft,
+                        endTime: event.target.value,
+                      }))
+                    }
+                    className="field"
+                  />
+                </div>
+                <div>
+                  <label className="label-text">Time Spent</label>
+                  <input
+                    type="text"
+                    value={previewDraft.timeSpent}
+                    onChange={(event) =>
+                      setPreviewDraft((draft) => ({
+                        ...draft,
+                        timeSpent: event.target.value,
+                      }))
+                    }
+                    className="field"
+                  />
+                </div>
+              </div>
+
               <div className="flex justify-end gap-3">
                 <button
                   type="button"
-                  onClick={() => {
-                    setPreviewTask(null);
-                    setPreviewDraft("");
-                  }}
+                  onClick={handleClosePreview}
                   className="h-10 rounded border border-[#d8deea] px-4 text-sm font-medium text-[#5d668b] hover:bg-[#f6f8fc] transition-colors"
                 >
                   Cancel

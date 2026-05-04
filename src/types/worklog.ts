@@ -2,6 +2,8 @@ export interface Task {
   id: string;
   date: string;
   task: string;
+  startTime: string;
+  endTime: string;
   status: string;
   timeSpent: string;
 }
@@ -25,6 +27,8 @@ export function createTask(overrides?: Partial<Task>): Task {
     id: uid(),
     date,
     task: "",
+    startTime: "",
+    endTime: "",
     status: "Yet to Start",
     timeSpent: "",
     ...overrides,

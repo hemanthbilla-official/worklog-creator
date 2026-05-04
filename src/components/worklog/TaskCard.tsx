@@ -2,6 +2,7 @@ import { Trash2, ChevronDown, ChevronUp, BookOpenText } from "lucide-react";
 import AutocompleteInput from "./AutocompleteInput";
 import type { Task } from "@/types";
 import { STATUSES } from "@/constants";
+import { normalizeClockTimeTo12Hour } from "@/utils";
 
 interface TaskCardProps {
   task: Task;
@@ -49,9 +50,9 @@ export default function TaskCard({
     return (
       <div
         onClick={onToggle}
-        className="glass-card px-5 py-3 flex items-center justify-between cursor-pointer hover:border-gray-300 transition-colors"
+        className="glass-card px-5 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between cursor-pointer hover:border-gray-300 transition-colors"
       >
-        <div className="flex items-center gap-3 min-w-0">
+        <div className="flex flex-wrap items-center gap-2 min-w-0">
           <span className="text-xs font-bold text-gray-400 uppercase shrink-0">
             #{index + 1}
           </span>
@@ -63,6 +64,12 @@ export default function TaskCard({
           <span className="text-sm font-medium text-gray-800 truncate">
             {summary}
           </span>
+          {(task.startTime || task.endTime) && (
+            <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full shrink-0">
+              {normalizeClockTimeTo12Hour(task.startTime) || "--:--"}-
+              {normalizeClockTimeTo12Hour(task.endTime) || "--:--"}
+            </span>
+          )}
           {task.timeSpent && (
             <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full shrink-0">
               {task.timeSpent}
@@ -154,7 +161,18 @@ export default function TaskCard({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[160px_minmax(0,1fr)_160px_220px] gap-4">
+      <div className="space-y-4">
+        <div>
+          <label className="label-text">Tasks</label>
+          <AutocompleteInput
+            value={task.task}
+            onChange={(v) => onUpdate("task", v)}
+            suggestions={suggestions}
+            placeholder="Very detailed task, e.g. Conduct React hooks practice session with examples and doubt clarification"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-5 gap-4">
         <div>
           <label className="label-text">Date</label>
           <input
@@ -165,12 +183,23 @@ export default function TaskCard({
           />
         </div>
         <div>
-          <label className="label-text">Tasks</label>
-          <AutocompleteInput
-            value={task.task}
-            onChange={(v) => onUpdate("task", v)}
-            suggestions={suggestions}
-            placeholder="Very detailed task, e.g. Conduct React hooks practice session with examples and doubt clarification"
+          <label className="label-text">Start Time</label>
+          <input
+            type="text"
+            placeholder="8:30 AM"
+            value={task.startTime}
+            onChange={(e) => onUpdate("startTime", e.target.value)}
+            className="field"
+          />
+        </div>
+        <div>
+          <label className="label-text">End Time</label>
+          <input
+            type="text"
+            placeholder="9:30 AM"
+            value={task.endTime}
+            onChange={(e) => onUpdate("endTime", e.target.value)}
+            className="field"
           />
         </div>
         <div>
@@ -196,6 +225,7 @@ export default function TaskCard({
               </option>
             ))}
           </select>
+        </div>
         </div>
       </div>
     </div>

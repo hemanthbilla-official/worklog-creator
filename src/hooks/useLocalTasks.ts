@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import type { Task } from "@/types";
 import { createTask } from "@/types";
+import { normalizeClockTimeTo12Hour } from "@/utils";
 
 const TASKS_KEY = "worklog_tasks";
 const DATE_KEY = "worklog_lastAccessedDate";
@@ -10,17 +11,35 @@ function todayDateString(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-function isTask(value: unknown): value is Task {
-  if (!value || typeof value !== "object") return false;
+function normalizeStoredTask(value: unknown): Task | null {
+  if (!value || typeof value !== "object") return null;
   const record = value as Record<string, unknown>;
 
-  return (
-    typeof record.id === "string" &&
-    typeof record.date === "string" &&
-    typeof record.task === "string" &&
-    typeof record.status === "string" &&
-    typeof record.timeSpent === "string"
-  );
+  if (
+    typeof record.id !== "string" ||
+    typeof record.date !== "string" ||
+    typeof record.task !== "string" ||
+    typeof record.status !== "string" ||
+    typeof record.timeSpent !== "string"
+  ) {
+    return null;
+  }
+
+  return {
+    id: record.id,
+    date: record.date,
+    task: record.task,
+    startTime:
+      typeof record.startTime === "string"
+        ? normalizeClockTimeTo12Hour(record.startTime)
+        : "",
+    endTime:
+      typeof record.endTime === "string"
+        ? normalizeClockTimeTo12Hour(record.endTime)
+        : "",
+    timeSpent: record.timeSpent,
+    status: record.status,
+  };
 }
 
 function loadTasks(): Task[] {
@@ -43,7 +62,9 @@ function loadTasks(): Task[] {
   try {
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(isTask);
+    return parsed
+      .map(normalizeStoredTask)
+      .filter((task): task is Task => task !== null);
   } catch {
     return [];
   }
@@ -68,7 +89,7 @@ export function useLocalTasks() {
   const addMultipleTasks = useCallback((overridesArray: Partial<Task>[]) => {
     const newTasks = overridesArray.map((overrides) => createTask(overrides));
     setTasks((prev) => [
-      ...prev.filter((t) => t.task || t.timeSpent),
+      ...prev.filter((t) => t.task || t.timeSpent || t.startTime || t.endTime),
       ...newTasks,
     ]);
 

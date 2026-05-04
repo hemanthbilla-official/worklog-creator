@@ -3,7 +3,13 @@ import { Sparkles, Settings, Loader2, AlertCircle, Play } from "lucide-react";
 import { useGeminiKey } from "@/hooks/useGeminiKey";
 import type { Task } from "@/types";
 import { normalizeStatus } from "@/constants";
-import { decimalHoursToTimeSpent } from "@/utils";
+import {
+  clockTimeToMinutes,
+  decimalHoursToTimeSpent,
+  minutesToClockTime12Hour,
+  normalizeClockTimeTo12Hour,
+  timeSpentToMinutes,
+} from "@/utils";
 
 interface AIQuickLogProps {
   globalDate: string;
@@ -14,10 +20,10 @@ const GEMINI_URL =
   "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent";
 
 function buildSystemPrompt(todayFormatted: string): string {
-  return `You are a smart worklog assistant. The user will describe their day casually, sometimes with full details and sometimes vaguely (for example: "standup, 2 classes, helped students"). Turn that into four-column worklog entries for Google Sheets.
+  return `You are a smart worklog assistant. The user will describe their day casually, sometimes with full details and sometimes vaguely (for example: "standup, 2 classes, helped students"). Turn that into six-column worklog entries for Google Sheets.
 
 Key behaviors:
-- Return only these four fields: date, task, timeSpent, status.
+- Return only these six fields: date, task, startTime, endTime, timeSpent, status.
 - If the user enters multiple lines, treat each non-empty line as a separate worklog row. Do not merge lines.
 - Correct obvious spelling and capitalization mistakes in the final task text, such as "REact" to "React", "Ib3" to "IB3", "compeleted" to "completed", and "Praticipitated" to "Participated".
 - The task field must be detailed and specific enough to paste directly into the Tasks column.
@@ -26,7 +32,11 @@ Key behaviors:
 - Each task should usually be 14-28 words and include the action, audience or context, topic/activity, and useful outcome when inferable.
 - For example, "Class" becomes "Conduct React class for students covering component state, event handling, live examples, and doubt clarification" when that intent is clear.
 - If the user gives a duration, convert it to H:MM format for timeSpent (examples: 15 minutes = "0:15", 1 hour = "1:00", 90 minutes = "1:30").
-- If the user gives a start/end time range, calculate the duration and use H:MM for timeSpent.
+- If the user gives a start/end time range, fill startTime and endTime in 12-hour format with AM/PM (examples: "8:30 AM", "12:15 PM", "4:45 PM") and calculate timeSpent in H:MM.
+- If the user gives only a duration, fill timeSpent and leave startTime and endTime as "".
+- If the user gives a start time plus duration, infer endTime and fill all three time fields.
+- Maintain chronological context across lines. If a line has only a duration and the previous line has an endTime, use the previous endTime as the new line's startTime and add the duration to infer endTime.
+- Treat casual ranges like "9 30 to 10 30", "9:30 to 10:30", or "9.30-10.30" as time ranges. If AM/PM is missing, infer the most likely workday time from surrounding rows.
 - Treat phrases like "time took 1 hr", "took 1 hour", "spent 45 mins", or "for 30 minutes" as duration signals.
 - If the user is vague about duration, infer a reasonable Time Spent from the task context.
 - If you truly cannot infer Time Spent, leave timeSpent as "".
@@ -42,11 +52,22 @@ Status rules:
 - Valid statuses are ONLY: "Completed", "Not Done", "Yet to Start", "On Hold", "In Progress", "Carry Forward".
 
 Return ONLY a raw JSON array, with no markdown fences, explanation, or extra text:
-[{ "date": "YYYY-MM-DD", "task": "string", "timeSpent": "H:MM e.g. 1:30", "status": "Completed or Not Done etc" }]
+[{ "date": "YYYY-MM-DD", "task": "string", "startTime": "h:mm AM/PM or empty", "endTime": "h:mm AM/PM or empty", "timeSpent": "H:MM e.g. 1:30", "status": "Completed or Not Done etc" }]
+
+Sequential time example:
+User input:
+PS session for S2 9 30 to 10 30 completed
+React class for IB2 1 hour completed
+
+Output:
+[
+  { "date": "${todayFormatted}", "task": "Conduct problem solving session for S2 students with guided practice, exercise walkthroughs, and doubt clarification", "startTime": "9:30 AM", "endTime": "10:30 AM", "timeSpent": "1:00", "status": "Completed" },
+  { "date": "${todayFormatted}", "task": "Conduct React class for IB2 students with concept explanation, practical examples, and interactive doubt clarification", "startTime": "10:30 AM", "endTime": "11:30 AM", "timeSpent": "1:00", "status": "Completed" }
+]
 
 Example:
 User input: Conducted Practice session for S2 time took 1 hr and completed the task
-Output: [{ "date": "${todayFormatted}", "task": "Conduct practice session for S2 students with guided problem solving, exercise walkthroughs, and doubt clarification", "timeSpent": "1:00", "status": "Completed" }]
+Output: [{ "date": "${todayFormatted}", "task": "Conduct practice session for S2 students with guided problem solving, exercise walkthroughs, and doubt clarification", "startTime": "", "endTime": "", "timeSpent": "1:00", "status": "Completed" }]
 
 Multi-line example:
 User input:
@@ -60,17 +81,18 @@ Praticipitated in Learning Hours in progress 15 minutes
 
 Output:
 [
-  { "date": "${todayFormatted}", "task": "Conduct practice session for S2 students with guided problem solving, exercise walkthroughs, and doubt clarification", "timeSpent": "1:00", "status": "Completed" },
-  { "date": "${todayFormatted}", "task": "Conduct React class for IB2 students covering key concepts, practical examples, and student doubt clarification", "timeSpent": "1:00", "status": "Completed" },
-  { "date": "${todayFormatted}", "task": "Invigilate DSA examination by monitoring students, maintaining exam discipline, and supporting smooth assessment completion", "timeSpent": "1:30", "status": "Completed" },
-  { "date": "${todayFormatted}", "task": "Conduct React class for S2 students with concept explanation, hands-on examples, and interactive Q&A support", "timeSpent": "1:00", "status": "Completed" },
-  { "date": "${todayFormatted}", "task": "Work on project enhancements by adding new version updates, refining functionality, and validating implementation changes", "timeSpent": "1:00", "status": "Completed" },
-  { "date": "${todayFormatted}", "task": "Conduct React class for IB3 and IB6 students with topic explanation, examples, and doubt clarification", "timeSpent": "1:00", "status": "Completed" },
-  { "date": "${todayFormatted}", "task": "Participate in Learning Hours session to engage with ongoing discussions, learning activities, and collaborative knowledge sharing", "timeSpent": "0:15", "status": "In Progress" }
+  { "date": "${todayFormatted}", "task": "Conduct practice session for S2 students with guided problem solving, exercise walkthroughs, and doubt clarification", "startTime": "", "endTime": "", "timeSpent": "1:00", "status": "Completed" },
+  { "date": "${todayFormatted}", "task": "Conduct React class for IB2 students covering key concepts, practical examples, and student doubt clarification", "startTime": "", "endTime": "", "timeSpent": "1:00", "status": "Completed" },
+  { "date": "${todayFormatted}", "task": "Invigilate DSA examination by monitoring students, maintaining exam discipline, and supporting smooth assessment completion", "startTime": "", "endTime": "", "timeSpent": "1:30", "status": "Completed" },
+  { "date": "${todayFormatted}", "task": "Conduct React class for S2 students with concept explanation, hands-on examples, and interactive Q&A support", "startTime": "", "endTime": "", "timeSpent": "1:00", "status": "Completed" },
+  { "date": "${todayFormatted}", "task": "Work on project enhancements by adding new version updates, refining functionality, and validating implementation changes", "startTime": "", "endTime": "", "timeSpent": "1:00", "status": "Completed" },
+  { "date": "${todayFormatted}", "task": "Conduct React class for IB3 and IB6 students with topic explanation, examples, and doubt clarification", "startTime": "", "endTime": "", "timeSpent": "1:00", "status": "Completed" },
+  { "date": "${todayFormatted}", "task": "Participate in Learning Hours session to engage with ongoing discussions, learning activities, and collaborative knowledge sharing", "startTime": "", "endTime": "", "timeSpent": "0:15", "status": "In Progress" }
 ]
 
 Rules:
 - task must be a very detailed description, not a single word, bare category, or lightly edited copy of the user's shorthand.
+- startTime and endTime must be 12-hour time with AM/PM when present, otherwise "".
 - timeSpent must be H:MM when present. Do not use decimal hours.
 - one input line should produce exactly one output object unless the line clearly contains multiple separate tasks.
 - Output ONLY the JSON array. No other text whatsoever.`;
@@ -89,6 +111,60 @@ function stripMarkdownFences(text: string): string {
 function normalizeGeneratedTimeSpent(value: string): string {
   const normalized = decimalHoursToTimeSpent(value);
   return normalized || value.trim();
+}
+
+function fillSequentialTimes(tasks: Partial<Task>[]): Partial<Task>[] {
+  let previousEndMinutes: number | null = null;
+
+  return tasks.map((task) => {
+    const startTime = normalizeClockTimeTo12Hour(task.startTime || "");
+    const endTime = normalizeClockTimeTo12Hour(task.endTime || "");
+    const timeSpent = normalizeGeneratedTimeSpent(task.timeSpent || "");
+
+    const startMinutes = clockTimeToMinutes(startTime);
+    const endMinutes = clockTimeToMinutes(endTime);
+    const durationMinutes = timeSpentToMinutes(timeSpent);
+
+    if (startMinutes !== null && endMinutes !== null) {
+      previousEndMinutes = endMinutes;
+      return { ...task, startTime, endTime, timeSpent };
+    }
+
+    if (
+      !startTime &&
+      !endTime &&
+      previousEndMinutes !== null &&
+      durationMinutes !== null
+    ) {
+      const inferredEndMinutes = previousEndMinutes + durationMinutes;
+      const inferredTask = {
+        ...task,
+        startTime: minutesToClockTime12Hour(previousEndMinutes),
+        endTime: minutesToClockTime12Hour(inferredEndMinutes),
+        timeSpent,
+      };
+
+      previousEndMinutes = inferredEndMinutes;
+      return inferredTask;
+    }
+
+    if (startMinutes !== null && !endTime && durationMinutes !== null) {
+      const inferredEndMinutes = startMinutes + durationMinutes;
+      previousEndMinutes = inferredEndMinutes;
+      return {
+        ...task,
+        startTime,
+        endTime: minutesToClockTime12Hour(inferredEndMinutes),
+        timeSpent,
+      };
+    }
+
+    if (endMinutes !== null) {
+      previousEndMinutes = endMinutes;
+    }
+
+    return { ...task, startTime, endTime, timeSpent };
+  });
 }
 
 export default function AIQuickLog({
@@ -159,15 +235,18 @@ export default function AIQuickLog({
         throw new Error("AI returned an empty or invalid array");
       }
 
-      const taskOverrides: Partial<Task>[] = parsed.map((item) => ({
-        date: item.date || globalDate,
-        task: item.task || "",
-        timeSpent: normalizeGeneratedTimeSpent(item.timeSpent || ""),
-        status: normalizeStatus(item.status || "Not Done"),
-      }));
+      const taskOverrides = fillSequentialTimes(
+        parsed.map((item) => ({
+          date: item.date || globalDate,
+          task: item.task || "",
+          startTime: item.startTime || "",
+          endTime: item.endTime || "",
+          timeSpent: item.timeSpent || "",
+          status: normalizeStatus(item.status || "Not Done"),
+        })),
+      );
 
       onGenerate(taskOverrides);
-      setInput("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
@@ -248,7 +327,7 @@ export default function AIQuickLog({
       <div className="min-h-0 flex-1 bg-white">
         <textarea
           placeholder={
-            "Paste one task per line...\nConducted Practice session for S2 time took 1 hr and completed the task\nConducted React Class for IB2 time took 1hr completed\nPraticipitated in Learning Hours in progress 15 minutes"
+            "Paste one task per line...\nPS session for S2 9 30 to 10 30 completed\nReact class for IB2 1 hour completed\nLearning Hours in progress 15 minutes"
           }
           value={input}
           onChange={(e) => setInput(e.target.value)}
