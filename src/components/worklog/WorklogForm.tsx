@@ -14,10 +14,10 @@ import {
   Maximize2,
   X,
 } from "lucide-react";
-import type { Task } from "@/types";
-import { useLocalTasks } from "@/hooks/useLocalTasks";
-import { normalizeStatus, STATUSES } from "@/constants";
-import { normalizeClockTimeTo12Hour, todayISO } from "@/utils";
+import type { Task } from "../../types";
+import { useLocalTasks } from "../../hooks/useLocalTasks";
+import { normalizeStatus, STATUSES } from "../../constants";
+import { normalizeClockTimeTo12Hour, todayISO } from "../../utils";
 import TaskCard from "./TaskCard";
 import AIQuickLog from "./AIQuickLog";
 
@@ -118,9 +118,8 @@ export default function WorklogForm() {
   const [globalDate, setGlobalDate] = useState(todayISO());
   const [leftPanePct, setLeftPanePct] = useState(50);
   const [previewTask, setPreviewTask] = useState<Task | null>(null);
-  const [previewDraft, setPreviewDraft] = useState<PreviewDraft>(
-    createPreviewDraft(),
-  );
+  const [previewDraft, setPreviewDraft] =
+    useState<PreviewDraft>(createPreviewDraft());
 
   useEffect(() => {
     const currentIds = new Set(tasks.map((task) => task.id));
@@ -352,11 +351,17 @@ export default function WorklogForm() {
           title="Drag to resize panes. Double-click to reset."
         />
 
-        <section className="pane output-pane" aria-label="Generated worklog rows">
+        <section
+          className="pane output-pane"
+          aria-label="Generated worklog rows"
+        >
           <div className="pane-head">
             <div className="pane-title">
               <span>Output</span>
-              <span className="count-stamp" aria-label={`${tasks.length} tasks`}>
+              <span
+                className="count-stamp"
+                aria-label={`${tasks.length} tasks`}
+              >
                 {tasks.length}
               </span>
             </div>

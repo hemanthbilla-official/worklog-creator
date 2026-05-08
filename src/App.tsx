@@ -1,4 +1,4 @@
-import WorklogForm from "@/components/worklog";
+import WorklogForm from "./components/worklog";
 
 export default function App() {
   return (

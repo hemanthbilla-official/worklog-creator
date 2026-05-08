@@ -1,8 +1,8 @@
 import { Trash2, ChevronDown, ChevronUp, BookOpenText } from "lucide-react";
 import AutocompleteInput from "./AutocompleteInput";
-import type { Task } from "@/types";
-import { STATUSES } from "@/constants";
-import { normalizeClockTimeTo12Hour } from "@/utils";
+import type { Task } from "../../types";
+import { STATUSES } from "../../constants";
+import { normalizeClockTimeTo12Hour } from "../../utils";
 
 interface TaskCardProps {
   task: Task;

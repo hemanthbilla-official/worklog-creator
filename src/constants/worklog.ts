@@ -1,4 +1,4 @@
-import type { TaskTemplate } from "@/types";
+import type { TaskTemplate } from "../types";
 
 export const STATUSES = [
   "Completed",

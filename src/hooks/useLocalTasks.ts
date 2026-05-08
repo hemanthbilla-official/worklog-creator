@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
-import type { Task } from "@/types";
-import { createTask } from "@/types";
-import { normalizeClockTimeTo12Hour } from "@/utils";
+import type { Task } from "../types";
+import { createTask } from "../types";
+import { normalizeClockTimeTo12Hour } from "../utils";
 
 const TASKS_KEY = "worklog_tasks";
 const DATE_KEY = "worklog_lastAccessedDate";

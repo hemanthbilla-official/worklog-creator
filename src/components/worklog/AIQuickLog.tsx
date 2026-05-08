@@ -1,15 +1,15 @@
 import { useState } from "react";
 import { Sparkles, Settings, Loader2, AlertCircle, Play } from "lucide-react";
-import { useGeminiKey } from "@/hooks/useGeminiKey";
-import type { Task } from "@/types";
-import { normalizeStatus } from "@/constants";
+import { useGeminiKey } from "../../hooks/useGeminiKey";
+import type { Task } from "../../types";
+import { normalizeStatus } from "../../constants";
 import {
   clockTimeToMinutes,
   decimalHoursToTimeSpent,
   minutesToClockTime12Hour,
   normalizeClockTimeTo12Hour,
   timeSpentToMinutes,
-} from "@/utils";
+} from "../../utils";
 
 interface AIQuickLogProps {
   globalDate: string;
@@ -17,7 +17,7 @@ interface AIQuickLogProps {
 }
 
 const GEMINI_URL =
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent";
+  "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent";
 
 function buildSystemPrompt(todayFormatted: string): string {
   return `You are a smart worklog assistant. The user will describe their day casually, sometimes with full details and sometimes vaguely (for example: "standup, 2 classes, helped students"). Turn that into six-column worklog entries for Google Sheets.
