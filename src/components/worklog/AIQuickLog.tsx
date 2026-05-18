@@ -40,56 +40,95 @@ Format:
 Rules:
 
 - Each non-empty input line = one worklog entry.
-- Do not merge lines unless a single line clearly contains multiple tasks.
+- Do not merge lines unless a line clearly contains multiple tasks.
 - Default date = "${todayFormatted}" unless explicitly provided.
 
 Task Rules:
-- Keep tasks short, clear, and professional.
+- Keep tasks concise, clear, and professional.
+- Do not return the exact user text unchanged.
+- Improve wording naturally while keeping it easy to read.
+- Prefer task descriptions between 8–16 words.
+- Add meaningful context like topic, activity, or purpose when useful.
+- Avoid overly detailed explanations or filler wording.
 - Do not use single-word tasks.
-- Prefer concise descriptions between 5–12 words.
-- Expand shorthand only when necessary for clarity.
-- Correct obvious spelling/capitalization mistakes:
-  - "REact" → "React"
-  - "Ib3" → "IB3"
-  - "compeleted" → "completed"
-  - "Praticipitated" → "Participated"
+- Expand shorthand only when needed for clarity.
+
+Examples:
+- "react class ib2"
+  → "Conduct React class for IB2 students with hands-on examples"
+
+- "dsa doubts"
+  → "Resolve DSA student doubts and explain problem approaches"
+
+- "project work"
+  → "Work on project feature enhancements and version updates"
+
+- "learning hours"
+  → "Participate in Learning Hours discussion and collaborative learning"
+
+Spelling/Capitalization:
+- "REact" → "React"
+- "Ib3" → "IB3"
+- "compeleted" → "completed"
+- "Praticipitated" → "Participated"
 
 Time Rules:
-- Convert durations to H:MM format:
+- Convert durations into H:MM format:
   - 15 mins → "0:15"
   - 1 hour → "1:00"
   - 90 mins → "1:30"
+
 - If only duration is provided:
   - fill timeSpent
   - leave startTime/endTime empty
+
 - If start + end time provided:
-  - fill all time fields
-  - calculate duration
+  - calculate timeSpent
+
 - If start time + duration provided:
-  - infer end time
-- Support casual formats:
+  - infer endTime
+
+- Support casual time formats:
   - "9 30 to 10 30"
   - "9:30-10:30"
   - "9.30 to 10.30"
+
 - If AM/PM missing, infer from surrounding context.
+
 - Maintain sequential continuity:
-  - if previous row has endTime
-  - and next row only has duration
+  - if previous entry has endTime
+  - and next entry only has duration
   - use previous endTime as next startTime.
 
 Status Rules:
 - Default = "Not Done"
-- Completed:
-  - done, completed, finished, over
-  - or obvious past tense actions
-- In Progress:
-  - doing, working on, ongoing
-- Yet to Start / Not Done:
-  - pending, need to, will do
-- On Hold:
-  - blocked, waiting, on hold
-- Carry Forward:
-  - tomorrow, postpone, carry forward
+
+Completed:
+- done
+- completed
+- finished
+- over
+- obvious past tense actions
+
+In Progress:
+- doing
+- working on
+- ongoing
+
+Yet to Start / Not Done:
+- pending
+- need to
+- will do
+
+On Hold:
+- blocked
+- waiting
+- on hold
+
+Carry Forward:
+- tomorrow
+- postpone
+- carry forward
 
 Valid statuses ONLY:
 - Completed
@@ -108,7 +147,7 @@ Output:
 [
   {
     "date": "${todayFormatted}",
-    "task": "Conduct React class for IB2 students",
+    "task": "Conduct React class for IB2 students with hands-on examples",
     "startTime": "",
     "endTime": "",
     "timeSpent": "1:00",
@@ -118,13 +157,13 @@ Output:
 
 Input:
 PS session for S2 9 30 to 10 30 completed
-React class for IB2 1 hour completed
+Project updates 1 hour done
 
 Output:
 [
   {
     "date": "${todayFormatted}",
-    "task": "Conduct PS session for S2 students",
+    "task": "Conduct PS session for S2 students with guided practice",
     "startTime": "9:30 AM",
     "endTime": "10:30 AM",
     "timeSpent": "1:00",
@@ -132,7 +171,7 @@ Output:
   },
   {
     "date": "${todayFormatted}",
-    "task": "Conduct React class for IB2 students",
+    "task": "Work on project updates and feature improvements",
     "startTime": "10:30 AM",
     "endTime": "11:30 AM",
     "timeSpent": "1:00",
@@ -145,7 +184,6 @@ No markdown.
 No explanations.
 No extra text.`;
 }
-
 function stripMarkdownFences(text: string): string {
   let cleaned = text.trim();
   if (cleaned.startsWith("```")) {
